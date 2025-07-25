@@ -380,6 +380,66 @@ class EfficiencyPlatform {
         this.showSuccessMessage('筛选条件已应用');
     }
 
+    // 下载报告功能
+    async downloadReport() {
+        try {
+            // 显示下载开始提示
+            this.showSuccessMessage('正在生成PDF报告，请稍候...');
+            
+            // 构建包含筛选条件的请求参数
+            const params = new URLSearchParams();
+            if (this.filters.department && this.filters.department !== 'all') {
+                params.append('department', this.filters.department);
+            }
+            if (this.filters.date) {
+                params.append('date', this.filters.date);
+            }
+            
+            const queryString = params.toString();
+            const url = `${API_BASE_URL}/api/download/report${queryString ? '?' + queryString : ''}`;
+            
+            // 发起下载请求
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/pdf'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error('下载失败');
+            }
+            
+            // 获取文件blob
+            const blob = await response.blob();
+            
+            // 创建下载链接
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            
+            // 生成文件名
+            const department = this.filters.department === 'all' ? '全部部门' : this.filters.department;
+            const date = this.filters.date || new Date().toISOString().slice(0, 7);
+            link.download = `研发效能报告_${department}_${date}.pdf`;
+            
+            // 触发下载
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // 清理URL对象
+            window.URL.revokeObjectURL(downloadUrl);
+            
+            // 显示下载成功提示
+            this.showSuccessMessage('PDF报告下载成功！');
+            
+        } catch (error) {
+            console.error('下载报告失败:', error);
+            this.showErrorMessage('下载报告失败，请稍后重试');
+        }
+    }
+
     showErrorMessage(message) {
         const errorDiv = document.createElement('div');
         errorDiv.className = 'error-message';
@@ -461,6 +521,13 @@ async function saveSettings() {
 function applyFilters() {
     if (window.efficiencyPlatform) {
         window.efficiencyPlatform.applyFilters();
+    }
+}
+
+// 全局下载报告函数
+function downloadReport() {
+    if (window.efficiencyPlatform) {
+        window.efficiencyPlatform.downloadReport();
     }
 }
 
