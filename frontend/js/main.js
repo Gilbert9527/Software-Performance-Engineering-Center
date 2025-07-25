@@ -14,6 +14,7 @@ class EfficiencyPlatform {
         this.bindEvents();
         this.initFilters();
         this.loadInitialData();
+        // 移除：this.initStickyFilters();
     }
 
     bindEvents() {
@@ -415,6 +416,9 @@ class ThemeManager {
         this.updateThemeIcon();
         localStorage.setItem('theme', newTheme);
         
+        // 触发主题变更事件，通知图表更新
+        document.dispatchEvent(new CustomEvent('themeChanged', { detail: { theme: newTheme } }));
+        
         // 显示切换成功提示
         this.showThemeMessage(`已切换到${newTheme === 'dark' ? '暗色' : '亮色'}模式`);
     }
@@ -477,3 +481,29 @@ function toggleTheme() {
 document.addEventListener('DOMContentLoaded', () => {
     window.themeManager = new ThemeManager();
 });
+
+// 移除整个initStickyFilters方法
+// initStickyFilters() {
+//     const filtersElement = document.querySelector('.dashboard-filters');
+//     if (!filtersElement) return;
+//
+//     const observer = new IntersectionObserver(
+//         (entries) => {
+//             entries.forEach(entry => {
+//                 if (entry.isIntersecting) {
+//                     // 筛选框完全可见时移除sticky样式
+//                     filtersElement.classList.remove('sticky');
+//                 } else {
+//                     // 筛选框部分或完全不可见时添加sticky样式
+//                     filtersElement.classList.add('sticky');
+//                 }
+//             });
+//         },
+//         {
+//             threshold: [0.9], // 当90%可见时触发
+//             rootMargin: '-70px 0px 0px 0px' // 考虑导航栏高度
+//         }
+//     );
+//
+//     observer.observe(filtersElement);
+

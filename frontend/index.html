@@ -138,8 +138,46 @@
             <!-- 趋势概览 -->
             <div id="trends" class="dashboard-content">
                 <div class="trends-container">
+                    <!-- 吞吐率折线图 -->
                     <div class="chart-container">
-                        <canvas id="trendsChart"></canvas>
+                        <h3 class="chart-title">吞吐率趋势</h3>
+                        <canvas id="throughputChart"></canvas>
+                    </div>
+                    
+                    <!-- 本月非事务型交付需求数量折线图 -->
+                    <div class="chart-container">
+                        <h3 class="chart-title">本月非事务型交付需求数量</h3>
+                        <canvas id="deliveredRequirementsChart"></canvas>
+                    </div>
+                    
+                    <!-- 本月新增交付需求数量折线图 -->
+                    <div class="chart-container">
+                        <h3 class="chart-title">本月新增交付需求数量</h3>
+                        <canvas id="newRequirementsChart"></canvas>
+                    </div>
+                    
+                    <!-- 需求交付周期P75分位折线图 -->
+                    <div class="chart-container">
+                        <h3 class="chart-title">需求交付周期（P75分位）</h3>
+                        <canvas id="deliveryCycleChart"></canvas>
+                    </div>
+                    
+                    <!-- 线上缺陷数折线图 -->
+                    <div class="chart-container">
+                        <h3 class="chart-title">线上缺陷数</h3>
+                        <canvas id="onlineDefectsChart"></canvas>
+                    </div>
+                    
+                    <!-- Reopen率折线图 -->
+                    <div class="chart-container">
+                        <h3 class="chart-title">Reopen率</h3>
+                        <canvas id="reopenRateChart"></canvas>
+                    </div>
+                    
+                    <!-- 代码当量折线图 -->
+                    <div class="chart-container">
+                        <h3 class="chart-title">代码当量</h3>
+                        <canvas id="codeEquivalentChart"></canvas>
                     </div>
                 </div>
             </div>
@@ -182,10 +220,14 @@
         </section>
     </main>
 
+    <!-- Chart.js库 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
     <script src="js/main.js"></script>
     <script src="js/dashboard.js"></script>
     <script src="js/ai-analysis.js"></script>
     <script src="js/settings.js"></script>
+    <script src="js/charts.js"></script>
 </body>
 
 </html>

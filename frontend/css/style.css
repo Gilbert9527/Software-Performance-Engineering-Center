@@ -651,10 +651,16 @@ tr:hover td {
 
 
 
-/* 响应式优化 */
+/* 响应式优化 - 移动端 */
 @media (max-width: 768px) {
     .dashboard-filters {
-        padding: 12px 16px;
+        top: 70px; /* 移动端导航栏高度 */
+        padding: 15px 16px;
+        margin-bottom: 20px;
+    }
+    
+    .dashboard-filters.sticky {
+        box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
     }
     
     .filters-container {
@@ -682,7 +688,8 @@ tr:hover td {
 
 @media (max-width: 480px) {
     .dashboard-filters {
-        padding: 20px 15px;
+        padding: 12px 15px;
+        border-radius: 12px;
     }
     
     .filter-select,
@@ -1165,6 +1172,26 @@ tr:hover td {
     margin-bottom: 30px;
     border: 1px solid var(--apple-gray-200);
     box-shadow: var(--apple-shadow-sm);
+    position: sticky;
+    top: 70px; /* 与导航栏高度保持一致 */
+    z-index: 999; /* 确保在其他内容之上，但低于导航栏 */
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    /* 添加过渡效果 */
+    transition: all 0.3s ease;
+}
+
+/* 当筛选框处于sticky状态时的样式优化 */
+.dashboard-filters.sticky {
+    background: rgba(248, 250, 252, 0.95);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    border-color: var(--apple-gray-300);
+}
+
+/* 暗色模式下的sticky状态 */
+[data-theme="dark"] .dashboard-filters.sticky {
+    background: rgba(28, 28, 30, 0.95);
+    border-color: var(--apple-gray-400);
 }
 
 .filters-container {
@@ -1261,34 +1288,7 @@ tr:hover td {
     background: var(--apple-hover-bg);
 }
 
-/* 响应式优化 */
-@media (max-width: 768px) {
-    .dashboard-filters {
-        padding: 12px 16px;
-    }
-    
-    .filters-container {
-        flex-direction: column;
-        gap: 12px;
-        margin-bottom: 12px;
-    }
-    
-    .filter-group {
-        min-width: 100%;
-    }
-    
-    .filter-actions {
-        margin-left: 0;
-        justify-content: center;
-        width: 100%;
-    }
-    
-    .filter-apply-btn,
-    .filter-reset-btn {
-        flex: 1;
-        max-width: 120px;
-    }
-}
+
 
 @media (max-width: 480px) {
     .dashboard-filters {
@@ -2457,5 +2457,90 @@ tr:focus-within {
     .theme-toggle {
         min-height: 44px;
         min-width: 44px;
+    }
+}/* 趋势图
+表样式 */
+.trends-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    gap: 30px;
+    margin-top: 20px;
+}
+
+.chart-container {
+    background: var(--apple-white);
+    border-radius: var(--apple-radius-xl);
+    padding: 25px;
+    border: 1px solid var(--apple-gray-200);
+    box-shadow: var(--apple-shadow-sm);
+    transition: var(--apple-transition);
+    height: 400px;
+    position: relative;
+}
+
+.chart-container:hover {
+    box-shadow: var(--apple-shadow-md);
+    transform: translateY(-2px);
+}
+
+.chart-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--apple-gray-900);
+    margin-bottom: 20px;
+    text-align: center;
+    border-bottom: 2px solid var(--apple-gray-100);
+    padding-bottom: 10px;
+}
+
+.chart-container canvas {
+    width: 100% !important;
+    height: calc(100% - 60px) !important;
+}
+
+/* 暗色模式下的图表样式 */
+[data-theme="dark"] .chart-container {
+    background: var(--apple-gray-100);
+    border-color: var(--apple-gray-300);
+}
+
+[data-theme="dark"] .chart-title {
+    color: var(--apple-gray-900);
+    border-bottom-color: var(--apple-gray-300);
+}
+
+/* 响应式图表布局 */
+@media (max-width: 1200px) {
+    .trends-container {
+        grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+        gap: 25px;
+    }
+}
+
+@media (max-width: 768px) {
+    .trends-container {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+    
+    .chart-container {
+        height: 350px;
+        padding: 20px;
+    }
+    
+    .chart-title {
+        font-size: 16px;
+    }
+}
+
+@media (max-width: 480px) {
+    .chart-container {
+        height: 300px;
+        padding: 15px;
+    }
+    
+    .chart-title {
+        font-size: 14px;
+        margin-bottom: 15px;
     }
 }
