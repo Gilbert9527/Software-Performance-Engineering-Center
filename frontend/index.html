@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>研发效能管理平台</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/components.css">
+</head>
+
+<body>
+    <!-- 跳过链接（屏幕阅读器支持） -->
+    <a href="#main-content" class="skip-link">跳转到主要内容</a>
+
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <h2>研发效能管理平台</h2>
+            </div>
+            <div class="nav-menu">
+                <a href="#dashboard" class="nav-link active" data-tab="dashboard" aria-current="page"
+                    role="tab">数据大屏</a>
+                <a href="#ai-analysis" class="nav-link" data-tab="ai-analysis" role="tab">AI分析</a>
+                <a href="#settings" class="nav-link" data-tab="settings" role="tab">系统设置</a>
+                <button class="theme-toggle" onclick="toggleTheme()" aria-label="切换暗色模式">
+                    <span class="theme-icon">🌙</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主内容区域 -->
+    <main class="main-content" id="main-content">
+        <!-- 数据大屏模块 -->
+        <section id="dashboard" class="content-section active">
+            <div class="dashboard-header">
+                <!-- 新增筛选条件区域 - 紧凑版本 -->
+                <div class="dashboard-filters">
+                    <div class="filters-container">
+                        <div class="filter-group">
+                            <label for="department-filter">部门筛选</label>
+                            <select id="department-filter" class="filter-select">
+                                <option value="all">全部部门</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="date-filter">日期筛选</label>
+                            <input type="month" id="date-filter" class="filter-input" />
+                        </div>
+                        <div class="filter-actions">
+                            <button class="filter-apply-btn" onclick="applyFilters()">筛选</button>
+                            <button class="filter-reset-btn" onclick="resetFilters()">重置</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-tabs">
+                    <button class="tab-btn active" data-dashboard-tab="metrics">数据指标</button>
+                    <button class="tab-btn" data-dashboard-tab="trends">趋势概览</button>
+                    <button class="tab-btn" data-dashboard-tab="rankings">排行榜</button>
+                    <button class="tab-btn" data-dashboard-tab="details">明细数据</button>
+                </div>
+            </div>
+
+            <!-- 数据指标 -->
+            <div id="metrics" class="dashboard-content active">
+                <!-- 交付效率 -->
+                <div class="metrics-section">
+                    <h2 class="section-title">交付效率</h2>
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <h3>需求吞吐率</h3>
+                            <div class="metric-value" id="requirement-throughput">--</div>
+                        </div>
+                        <div class="metric-card">
+                            <h3>本月非事务型交付需求数量</h3>
+                            <div class="metric-value" id="monthly-delivered-requirements">--</div>
+                        </div>
+                        <div class="metric-card">
+                            <h3>本月新增需求数量</h3>
+                            <div class="metric-value" id="monthly-new-requirements">--</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 交付速度 -->
+                <div class="metrics-section">
+                    <h2 class="section-title">交付速度</h2>
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <h3>需求交付周期（P75分位）</h3>
+                            <div class="metric-value" id="delivery-cycle-p75">--</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 交付质量 -->
+                <div class="metrics-section">
+                    <h2 class="section-title">交付质量</h2>
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <h3>线上缺陷数量</h3>
+                            <div class="metric-value" id="online-defects">--</div>
+                        </div>
+                        <div class="metric-card">
+                            <h3>Reopen率</h3>
+                            <div class="metric-value" id="reopen-rate">--</div>
+                        </div>
+                        <div class="metric-card">
+                            <h3>紧急上线次数</h3>
+                            <div class="metric-value" id="emergency-releases">--</div>
+                        </div>
+                        <div class="metric-card">
+                            <h3>故障数</h3>
+                            <div class="metric-value" id="incident-count">--</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 工作量 -->
+                <div class="metrics-section">
+                    <h2 class="section-title">工作量</h2>
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <h3>工作饱和度</h3>
+                            <div class="metric-value" id="work-saturation">--</div>
+                        </div>
+                        <div class="metric-card">
+                            <h3>代码当量</h3>
+                            <div class="metric-value" id="code-equivalent">--</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 趋势概览 -->
+            <div id="trends" class="dashboard-content">
+                <div class="trends-container">
+                    <div class="chart-container">
+                        <canvas id="trendsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 排行榜 -->
+            <div id="rankings" class="dashboard-content">
+                <div class="rankings-container">
+                    <div class="ranking-list" id="developer-rankings"></div>
+                </div>
+            </div>
+
+            <!-- 明细数据 -->
+            <div id="details" class="dashboard-content">
+                <div class="details-container">
+                    <div class="data-table">
+                        <table id="details-table">
+                            <thead>
+                                <tr>
+                                    <th>项目名称</th>
+                                    <th>开发者</th>
+                                    <th>提交数</th>
+                                    <th>代码行数</th>
+                                    <th>Bug数量</th>
+                                    <th>完成时间</th>
+                                </tr>
+                            </thead>
+                            <tbody id="details-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- AI分析模块 - 保留模块框架，删除内容 -->
+        <section id="ai-analysis" class="content-section">
+        </section>
+
+        <!-- 系统设置模块 - 保留模块框架，删除内容 -->
+        <section id="settings" class="content-section">
+        </section>
+    </main>
+
+    <script src="js/main.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/ai-analysis.js"></script>
+    <script src="js/settings.js"></script>
+</body>
+
+</html>
