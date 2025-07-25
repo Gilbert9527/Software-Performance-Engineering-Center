@@ -1,9 +1,23 @@
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, send_file
 from flask_cors import CORS
 import sqlite3
 import os
 from datetime import datetime, timedelta
 import calendar
+import io
+from reportlab.lib.pagesizes import A4, letter
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
+from reportlab.graphics.shapes import Drawing
+from reportlab.graphics.charts.linecharts import HorizontalLineChart
+from reportlab.graphics.charts.barcharts import VerticalBarChart
+from reportlab.lib.colors import HexColor
+import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Agg')  # 使用非交互式后端
+import numpy as np
 
 app = Flask(__name__)
 CORS(app)
@@ -468,6 +482,308 @@ def handle_settings():
         conn.close()
         
         return jsonify({'success': True})
+
+def create_chart_image(chart_type, data, title, width=400, height=300):
+    """创建图表图片"""
+    plt.figure(figsize=(width/100, height/100))
+    plt.style.use('default')
+    
+    if chart_type == 'bar':
+        labels = [item['name'] for item in data]
+        values = [item['value'] for item in data]
+        bars = plt.bar(labels, values, color=['#007AFF', '#30D158', '#FF9500', '#FF3B30', '#5856D6'])
+        plt.xticks(rotation=45, ha='right')
+        
+        # 在柱子上添加数值标签
+        for bar, value in zip(bars, values):
+            plt.text(bar.get_x() + bar.get_width()/2, bar.get_height() + max(values)*0.01,
+                    str(value), ha='center', va='bottom', fontsize=10)
+    
+    elif chart_type == 'line':
+        x_data = list(range(len(data)))
+        y_data = [item['value'] for item in data]
+        plt.plot(x_data, y_data, marker='o', linewidth=2, markersize=6, color='#007AFF')
+        plt.xticks(x_data, [item['name'] for item in data], rotation=45, ha='right')
+        plt.grid(True, alpha=0.3)
+    
+    plt.title(title, fontsize=14, fontweight='bold', pad=20)
+    plt.tight_layout()
+    
+    # 保存到内存中的字节流
+    img_buffer = io.BytesIO()
+    plt.savefig(img_buffer, format='png', dpi=150, bbox_inches='tight')
+    img_buffer.seek(0)
+    plt.close()
+    
+    return img_buffer
+
+def generate_pdf_report(department, date_filter):
+    """生成PDF报告"""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=1*inch, bottomMargin=1*inch)
+    
+    # 获取样式
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        spaceAfter=30,
+        alignment=1,  # 居中
+        textColor=colors.HexColor('#007AFF')
+    )
+    
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading2'],
+        fontSize=16,
+        spaceAfter=12,
+        textColor=colors.HexColor('#333333')
+    )
+    
+    normal_style = ParagraphStyle(
+        'CustomNormal',
+        parent=styles['Normal'],
+        fontSize=12,
+        spaceAfter=12
+    )
+    
+    story = []
+    
+    # 标题
+    dept_text = department if department != '全部部门' else '全部部门'
+    title = f"研发效能管理平台报告<br/>{dept_text} - {date_filter}"
+    story.append(Paragraph(title, title_style))
+    story.append(Spacer(1, 20))
+    
+    # 生成时间
+    story.append(Paragraph(f"报告生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", normal_style))
+    story.append(Spacer(1, 30))
+    
+    # 1. 数据指标部分
+    story.append(Paragraph("1. 数据指标", heading_style))
+    
+    # 获取指标数据
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    where_clause, params = get_filter_conditions(department, date_filter)
+    
+    if department == '全部部门':
+        query = f'''
+            SELECT 
+                AVG(requirement_throughput) as requirement_throughput,
+                AVG(monthly_delivered_requirements) as monthly_delivered_requirements,
+                AVG(monthly_new_requirements) as monthly_new_requirements,
+                AVG(delivery_cycle_p75) as delivery_cycle_p75,
+                AVG(online_defects) as online_defects,
+                AVG(reopen_rate) as reopen_rate,
+                AVG(emergency_releases) as emergency_releases,
+                AVG(incident_count) as incident_count,
+                AVG(work_saturation) as work_saturation,
+                AVG(code_equivalent) as code_equivalent
+            FROM metrics 
+            WHERE {where_clause.replace('department = ?', '1=1') if 'department = ?' in where_clause else where_clause}
+        '''
+        if 'department = ?' in where_clause:
+            params = [p for p in params if p != department]
+    else:
+        query = f'''
+            SELECT 
+                requirement_throughput,
+                monthly_delivered_requirements,
+                monthly_new_requirements,
+                delivery_cycle_p75,
+                online_defects,
+                reopen_rate,
+                emergency_releases,
+                incident_count,
+                work_saturation,
+                code_equivalent
+            FROM metrics 
+            WHERE {where_clause}
+            ORDER BY created_at DESC
+            LIMIT 1
+        '''
+    
+    cursor.execute(query, params)
+    metrics_result = cursor.fetchone()
+    
+    if metrics_result:
+        # 创建指标表格
+        metrics_data = [
+            ['指标类别', '指标名称', '数值'],
+            ['交付效率', '需求吞吐率', str(int(metrics_result[0]) if metrics_result[0] else 0)],
+            ['', '本月非事务型交付需求数量', str(int(metrics_result[1]) if metrics_result[1] else 0)],
+            ['', '本月新增需求数量', str(int(metrics_result[2]) if metrics_result[2] else 0)],
+            ['交付速度', '需求交付周期（P75分位）', f"{metrics_result[3]:.1f}天" if metrics_result[3] else "0天"],
+            ['交付质量', '线上缺陷数量', str(int(metrics_result[4]) if metrics_result[4] else 0)],
+            ['', 'Reopen率', f"{metrics_result[5]:.1f}%" if metrics_result[5] else "0%"],
+            ['', '紧急上线次数', str(int(metrics_result[6]) if metrics_result[6] else 0)],
+            ['', '故障数', str(int(metrics_result[7]) if metrics_result[7] else 0)],
+            ['工作量', '工作饱和度', f"{metrics_result[8]:.1f}%" if metrics_result[8] else "0%"],
+            ['', '代码当量', str(int(metrics_result[9]) if metrics_result[9] else 0)]
+        ]
+        
+        metrics_table = Table(metrics_data, colWidths=[2*inch, 3*inch, 1.5*inch])
+        metrics_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#007AFF')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('FONTSIZE', (0, 1), (-1, -1), 10),
+        ]))
+        
+        story.append(metrics_table)
+        story.append(Spacer(1, 30))
+    
+    # 2. 排行榜部分
+    story.append(Paragraph("2. 排行榜", heading_style))
+    
+    # 获取排行榜数据
+    ranking_types = [
+        ('saturation', '工作饱和度排行榜', 'work_saturation'),
+        ('code', '代码当量排行榜', 'code_equivalent'),
+        ('defects', '缺陷数量排行榜', 'defect_count')
+    ]
+    
+    for ranking_type, ranking_title, field in ranking_types:
+        story.append(Paragraph(f"2.{ranking_types.index((ranking_type, ranking_title, field)) + 1} {ranking_title}", normal_style))
+        
+        order_direction = 'ASC' if ranking_type == 'defects' else 'DESC'
+        
+        if department == '全部部门':
+            query = f'''
+                SELECT name, AVG({field}) as avg_value
+                FROM developer_rankings 
+                WHERE {where_clause.replace('department = ?', '1=1') if 'department = ?' in where_clause else where_clause}
+                GROUP BY name
+                ORDER BY avg_value {order_direction}
+                LIMIT 10
+            '''
+            query_params = [p for p in params if p != department] if 'department = ?' in where_clause else params
+        else:
+            query = f'''
+                SELECT name, {field} as value
+                FROM developer_rankings 
+                WHERE {where_clause}
+                ORDER BY value {order_direction}
+                LIMIT 10
+            '''
+            query_params = params
+        
+        cursor.execute(query, query_params)
+        ranking_results = cursor.fetchall()
+        
+        if ranking_results:
+            ranking_data = [['排名', '姓名', '数值']]
+            for i, (name, value) in enumerate(ranking_results, 1):
+                if ranking_type == 'saturation':
+                    value_str = f"{value:.1f}%"
+                elif ranking_type == 'code':
+                    value_str = str(int(value))
+                else:  # defects
+                    value_str = f"{int(value)}个"
+                ranking_data.append([str(i), name, value_str])
+            
+            ranking_table = Table(ranking_data, colWidths=[1*inch, 2*inch, 1.5*inch])
+            ranking_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#30D158')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 11),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.lightgrey),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('FONTSIZE', (0, 1), (-1, -1), 10),
+            ]))
+            
+            story.append(ranking_table)
+            story.append(Spacer(1, 20))
+    
+    # 3. 明细数据部分
+    story.append(PageBreak())
+    story.append(Paragraph("3. 明细数据", heading_style))
+    
+    # 获取明细数据
+    query = f'''
+        SELECT person_name, position_name, project_name, saturation, code_equivalent, delivered_requirements, total_hours, ai_usage_days
+        FROM project_details 
+        WHERE {where_clause}
+        ORDER BY created_at DESC
+        LIMIT 20
+    '''
+    
+    cursor.execute(query, params)
+    details_results = cursor.fetchall()
+    
+    if details_results:
+        details_data = [['人员名称', '职位名称', '项目名称', '饱和度(%)', '代码当量', '交付需求数', '总工时(h)', 'AI使用人天']]
+        for row in details_results:
+            details_data.append([
+                row[0],  # person_name
+                row[1],  # position_name
+                row[2],  # project_name
+                f"{row[3]:.1f}" if row[3] else "0",  # saturation
+                str(int(row[4]) if row[4] else 0),  # code_equivalent
+                str(int(row[5]) if row[5] else 0),  # delivered_requirements
+                f"{row[6]:.1f}" if row[6] else "0",  # total_hours
+                f"{row[7]:.1f}" if row[7] else "0"   # ai_usage_days
+            ])
+        
+        details_table = Table(details_data, colWidths=[0.8*inch, 0.8*inch, 1.2*inch, 0.8*inch, 0.8*inch, 0.8*inch, 0.8*inch, 0.8*inch])
+        details_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#FF9500')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.lightblue),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ]))
+        
+        story.append(details_table)
+    
+    conn.close()
+    
+    # 构建PDF
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
+@app.route('/api/download/report')
+def download_report():
+    """下载PDF报告"""
+    try:
+        department = request.args.get('department', '全部部门')
+        date_filter = request.args.get('date', datetime.now().strftime('%Y-%m'))
+        
+        # 生成PDF
+        pdf_buffer = generate_pdf_report(department, date_filter)
+        
+        # 生成文件名
+        dept_name = department if department != '全部部门' else '全部部门'
+        filename = f"研发效能报告_{dept_name}_{date_filter}.pdf"
+        
+        return send_file(
+            pdf_buffer,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/pdf'
+        )
+        
+    except Exception as e:
+        print(f"生成PDF报告失败: {str(e)}")
+        return jsonify({'error': '生成PDF报告失败'}), 500
 
 if __name__ == '__main__':
     # 确保数据库目录存在
