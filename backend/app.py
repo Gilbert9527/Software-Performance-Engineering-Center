@@ -48,6 +48,14 @@ def init_database():
         )
     ''')
     
+    # 检查project_details表是否存在旧结构，如果是则重建
+    cursor.execute("PRAGMA table_info(project_details)")
+    columns = [column[1] for column in cursor.fetchall()]
+    
+    if 'person_name' not in columns:
+        # 删除旧表并重建
+        cursor.execute('DROP TABLE IF EXISTS project_details')
+    
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS project_details (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
