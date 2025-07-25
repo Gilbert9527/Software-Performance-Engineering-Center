@@ -11,6 +11,18 @@ CORS(app)
 # 数据库配置
 DATABASE_PATH = os.path.join(os.path.dirname(__file__), '..', 'database', 'efficiency.db')
 
+# 静态文件服务
+@app.route('/')
+def index():
+    frontend_path = os.path.join(os.path.dirname(__file__), '..', 'frontend')
+    return send_from_directory(frontend_path, 'index.html')
+
+@app.route('/<path:filename>')
+def static_files(filename):
+    frontend_path = os.path.join(os.path.dirname(__file__), '..', 'frontend')
+    return send_from_directory(frontend_path, filename)
+
+# 在数据库初始化中添加新的字段
 def init_database():
     """初始化数据库"""
     conn = sqlite3.connect(DATABASE_PATH)
@@ -21,10 +33,16 @@ def init_database():
         CREATE TABLE IF NOT EXISTS metrics (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             department TEXT DEFAULT '全部部门',
-            commit_count INTEGER,
-            bug_fix_rate REAL,
-            code_quality INTEGER,
-            delivery_efficiency REAL,
+            requirement_throughput INTEGER,
+            monthly_delivered_requirements INTEGER,
+            monthly_new_requirements INTEGER,
+            delivery_cycle_p75 REAL,
+            online_defects INTEGER,
+            reopen_rate REAL,
+            emergency_releases INTEGER,
+            incident_count INTEGER,
+            work_saturation REAL,
+            code_equivalent INTEGER,
             record_date TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -34,12 +52,14 @@ def init_database():
         CREATE TABLE IF NOT EXISTS project_details (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             department TEXT DEFAULT '全部部门',
+            person_name TEXT,
+            position_name TEXT,
             project_name TEXT,
-            developer TEXT,
-            commits INTEGER,
-            code_lines INTEGER,
-            bugs INTEGER,
-            completion_time TEXT,
+            saturation REAL,
+            code_equivalent INTEGER,
+            delivered_requirements INTEGER,
+            total_hours REAL,
+            ai_usage_days REAL,
             record_date TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -51,6 +71,9 @@ def init_database():
             department TEXT DEFAULT '全部部门',
             name TEXT,
             score INTEGER,
+            work_saturation REAL,
+            code_equivalent INTEGER,
+            defect_count INTEGER,
             record_date TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -77,22 +100,37 @@ def init_database():
         for dept in departments:
             # 插入指标数据
             cursor.execute('''
-                INSERT INTO metrics (department, commit_count, bug_fix_rate, code_quality, delivery_efficiency, record_date)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (dept, 1250 + hash(dept) % 500, 92.5 + (hash(dept) % 10) / 10, 85 + hash(dept) % 15, 88.3 + (hash(dept) % 20) / 10, current_date))
+                INSERT INTO metrics (department, requirement_throughput, monthly_delivered_requirements, 
+                monthly_new_requirements, delivery_cycle_p75, online_defects, reopen_rate, 
+                emergency_releases, incident_count, work_saturation, code_equivalent, record_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (dept, 
+                  120 + hash(dept + 'throughput') % 50,      # 需求吞吐率
+                  85 + hash(dept + 'delivered') % 30,        # 本月非事务型交付需求数量
+                  95 + hash(dept + 'new') % 40,              # 本月新增需求数量
+                  7.5 + (hash(dept + 'cycle') % 50) / 10,    # 需求交付周期P75分位
+                  12 + hash(dept + 'defects') % 20,          # 线上缺陷数量
+                  3.2 + (hash(dept + 'reopen') % 30) / 10,   # Reopen率
+                  2 + hash(dept + 'emergency') % 8,          # 紧急上线次数
+                  1 + hash(dept + 'incident') % 5,           # 故障数
+                  85.5 + (hash(dept + 'saturation') % 30) / 10,  # 工作饱和度
+                  1200 + hash(dept + 'equivalent') % 800,    # 代码当量
+                  current_date))
             
             # 插入项目详情数据
             projects = [
-                (f'{dept}-项目A', '张三', 45, 2300, 3, '2024-01-15'),
-                (f'{dept}-项目B', '李四', 38, 1800, 1, '2024-01-20'),
-                (f'{dept}-项目C', '王五', 52, 2800, 2, '2024-01-25')
+                ('张三', '高级开发工程师', f'{dept}-项目A', 85.5, 1200, 15, 160.5, 2.5),
+                ('李四', '开发工程师', f'{dept}-项目B', 78.2, 980, 12, 145.0, 1.8),
+                ('王五', '资深开发工程师', f'{dept}-项目C', 92.1, 1450, 18, 175.5, 3.2),
+                ('赵六', '开发工程师', f'{dept}-项目D', 76.8, 850, 10, 132.0, 1.5),
+                ('钱七', '高级开发工程师', f'{dept}-项目E', 88.9, 1350, 16, 168.0, 2.8)
             ]
             
             for project in projects:
                 cursor.execute('''
-                    INSERT INTO project_details (department, project_name, developer, commits, code_lines, bugs, completion_time, record_date)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (dept, project[0], project[1], project[2], project[3], project[4], project[5], current_date))
+                    INSERT INTO project_details (department, person_name, position_name, project_name, saturation, code_equivalent, delivered_requirements, total_hours, ai_usage_days, record_date)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (dept, project[0], project[1], project[2], project[3], project[4], project[5], project[6], project[7], current_date))
             
             # 插入开发者排行数据
             developers = [
@@ -103,20 +141,18 @@ def init_database():
             
             for dev in developers:
                 cursor.execute('''
-                    INSERT INTO developer_rankings (department, name, score, record_date)
-                    VALUES (?, ?, ?, ?)
-                ''', (dept, dev[0], dev[1], current_date))
-        
-        # 插入设置数据
-        cursor.execute('''
-            INSERT INTO settings (refresh_interval, email_notifications)
-            VALUES (10, 1)
-        ''')
+                    INSERT INTO developer_rankings (department, name, score, work_saturation, code_equivalent, defect_count, record_date)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (dept, dev[0], dev[1], 
+                      85.5 + (hash(dept + dev[0] + 'sat') % 30) / 10,  # 工作饱和度
+                      1200 + hash(dept + dev[0] + 'code') % 800,        # 代码当量
+                      hash(dept + dev[0] + 'defect') % 10,             # 缺陷数量
+                      current_date))
     
     conn.commit()
     conn.close()
 
-def get_filter_conditions(department=None, date_filter=None):
+def get_filter_conditions(department, date_filter):
     """构建筛选条件"""
     conditions = []
     params = []
@@ -132,18 +168,9 @@ def get_filter_conditions(department=None, date_filter=None):
     where_clause = ' AND '.join(conditions) if conditions else '1=1'
     return where_clause, params
 
-# 静态文件服务
-@app.route('/')
-def index():
-    return send_from_directory('../frontend', 'index.html')
-
-@app.route('/<path:path>')
-def static_files(path):
-    return send_from_directory('../frontend', path)
-
-# API路由
 @app.route('/api/dashboard/metrics')
 def get_metrics():
+    """获取指标数据"""
     department = request.args.get('department', '全部部门')
     date_filter = request.args.get('date', datetime.now().strftime('%Y-%m'))
     
@@ -153,25 +180,41 @@ def get_metrics():
     where_clause, params = get_filter_conditions(department, date_filter)
     
     if department == '全部部门':
-        # 聚合所有部门数据
+        # 聚合所有部门的数据
         query = f'''
             SELECT 
-                SUM(commit_count) as total_commits,
-                AVG(bug_fix_rate) as avg_bug_fix_rate,
-                AVG(code_quality) as avg_code_quality,
-                AVG(delivery_efficiency) as avg_delivery_efficiency
+                AVG(requirement_throughput) as requirement_throughput,
+                AVG(monthly_delivered_requirements) as monthly_delivered_requirements,
+                AVG(monthly_new_requirements) as monthly_new_requirements,
+                AVG(delivery_cycle_p75) as delivery_cycle_p75,
+                AVG(online_defects) as online_defects,
+                AVG(reopen_rate) as reopen_rate,
+                AVG(emergency_releases) as emergency_releases,
+                AVG(incident_count) as incident_count,
+                AVG(work_saturation) as work_saturation,
+                AVG(code_equivalent) as code_equivalent
             FROM metrics 
             WHERE {where_clause.replace('department = ?', '1=1') if 'department = ?' in where_clause else where_clause}
         '''
-        # 移除部门参数
-        if department != '全部部门' and 'department = ?' in where_clause:
+        if 'department = ?' in where_clause:
             params = [p for p in params if p != department]
     else:
         query = f'''
-            SELECT commit_count, bug_fix_rate, code_quality, delivery_efficiency
+            SELECT 
+                requirement_throughput,
+                monthly_delivered_requirements,
+                monthly_new_requirements,
+                delivery_cycle_p75,
+                online_defects,
+                reopen_rate,
+                emergency_releases,
+                incident_count,
+                work_saturation,
+                code_equivalent
             FROM metrics 
             WHERE {where_clause}
-            ORDER BY created_at DESC LIMIT 1
+            ORDER BY created_at DESC
+            LIMIT 1
         '''
     
     cursor.execute(query, params)
@@ -180,79 +223,115 @@ def get_metrics():
     
     if result:
         return jsonify({
-            'commitCount': int(result[0]) if result[0] else 0,
-            'bugFixRate': round(float(result[1]), 1) if result[1] else 0,
-            'codeQuality': int(result[2]) if result[2] else 0,
-            'deliveryEfficiency': round(float(result[3]), 1) if result[3] else 0
+            'requirementThroughput': int(result[0]) if result[0] else 0,
+            'monthlyDeliveredRequirements': int(result[1]) if result[1] else 0,
+            'monthlyNewRequirements': int(result[2]) if result[2] else 0,
+            'deliveryCycleP75': f"{result[3]:.1f}天" if result[3] else "0天",
+            'onlineDefects': int(result[4]) if result[4] else 0,
+            'reopenRate': round(result[5], 1) if result[5] else 0,
+            'emergencyReleases': int(result[6]) if result[6] else 0,
+            'incidentCount': int(result[7]) if result[7] else 0,
+            'workSaturation': round(result[8], 1) if result[8] else 0,
+            'codeEquivalent': int(result[9]) if result[9] else 0
         })
+    
     return jsonify({
-        'commitCount': 0,
-        'bugFixRate': 0,
-        'codeQuality': 0,
-        'deliveryEfficiency': 0
+        'requirementThroughput': 0,
+        'monthlyDeliveredRequirements': 0,
+        'monthlyNewRequirements': 0,
+        'deliveryCycleP75': "0天",
+        'onlineDefects': 0,
+        'reopenRate': 0,
+        'emergencyReleases': 0,
+        'incidentCount': 0,
+        'workSaturation': 0,
+        'codeEquivalent': 0
     })
 
 @app.route('/api/dashboard/trends')
 def get_trends():
+    """获取趋势数据"""
     department = request.args.get('department', '全部部门')
     date_filter = request.args.get('date', datetime.now().strftime('%Y-%m'))
     
-    # 生成趋势数据（模拟月度数据）
-    year, month = map(int, date_filter.split('-'))
-    days_in_month = calendar.monthrange(year, month)[1]
-    
-    trends = []
-    for day in range(1, min(days_in_month + 1, 31)):  # 最多显示30天
-        date_str = f"{year}-{month:02d}-{day:02d}"
-        # 模拟趋势值，根据部门和日期生成
-        base_value = 80
-        if department != '全部部门':
-            base_value += hash(department) % 10
-        value = base_value + (day % 10) + (hash(date_str) % 15)
-        trends.append({
-            'date': date_str,
-            'value': min(100, value)  # 限制最大值为100
-        })
-    
-    return jsonify({'trends': trends})
+    # 这里可以返回趋势图表数据
+    # 暂时返回空数据，实际应用中需要根据时间序列查询数据
+    return jsonify({
+        'trends': {
+            'throughput': [],
+            'deliveredRequirements': [],
+            'newRequirements': [],
+            'deliveryCycle': [],
+            'onlineDefects': [],
+            'reopenRate': [],
+            'codeEquivalent': []
+        }
+    })
 
+# 更新排行榜API
 @app.route('/api/dashboard/rankings')
 def get_rankings():
     department = request.args.get('department', '全部部门')
     date_filter = request.args.get('date', datetime.now().strftime('%Y-%m'))
+    ranking_type = request.args.get('type', 'score')
+    sort_order = request.args.get('sort', 'desc')
     
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     
     where_clause, params = get_filter_conditions(department, date_filter)
     
+    # 根据排行榜类型选择字段（去掉综合评分）
+    field_mapping = {
+        'saturation': 'work_saturation',
+        'code': 'code_equivalent',
+        'defects': 'defect_count'
+    }
+    
+    field = field_mapping.get(ranking_type, 'score')
+    order_direction = 'ASC' if sort_order == 'asc' else 'DESC'
+    
+    # 对于缺陷数量，默认升序（缺陷越少越好）
+    if ranking_type == 'defects' and sort_order == 'desc':
+        order_direction = 'ASC'
+    elif ranking_type == 'defects' and sort_order == 'asc':
+        order_direction = 'DESC'
+    
     if department == '全部部门':
-        # 聚合所有部门的开发者排行
+        # 聚合所有部门的数据
         query = f'''
-            SELECT name, AVG(score) as avg_score
+            SELECT name, AVG({field}) as avg_value
             FROM developer_rankings 
             WHERE {where_clause.replace('department = ?', '1=1') if 'department = ?' in where_clause else where_clause}
             GROUP BY name
-            ORDER BY avg_score DESC
+            ORDER BY avg_value {order_direction}
         '''
         if 'department = ?' in where_clause:
             params = [p for p in params if p != department]
     else:
         query = f'''
-            SELECT name, score 
+            SELECT name, {field} as value
             FROM developer_rankings 
             WHERE {where_clause}
-            ORDER BY score DESC
+            ORDER BY value {order_direction}
         '''
     
     cursor.execute(query, params)
     results = cursor.fetchall()
     conn.close()
     
-    rankings = [{
-        'name': row[0], 
-        'score': int(row[1]) if isinstance(row[1], (int, float)) else int(float(row[1]))
-    } for row in results]
+    rankings = []
+    for row in results:
+        value = row[1]
+        if ranking_type == 'saturation':
+            value = round(float(value), 1)
+        elif ranking_type in ['score', 'code', 'defects']:
+            value = int(value) if value is not None else 0
+            
+        rankings.append({
+            'name': row[0],
+            'value': value
+        })
     
     return jsonify({'rankings': rankings})
 
@@ -267,7 +346,7 @@ def get_details():
     where_clause, params = get_filter_conditions(department, date_filter)
     
     query = f'''
-        SELECT department, project_name, developer, commits, code_lines, bugs, completion_time
+        SELECT person_name, position_name, project_name, saturation, code_equivalent, delivered_requirements, total_hours, ai_usage_days
         FROM project_details 
         WHERE {where_clause}
         ORDER BY created_at DESC
@@ -278,13 +357,14 @@ def get_details():
     conn.close()
     
     details = [{
-        'department': row[0],
-        'projectName': row[1],
-        'developer': row[2],
-        'commits': row[3],
-        'codeLines': row[4],
-        'bugs': row[5],
-        'completionTime': row[6]
+        'personName': row[0],
+        'positionName': row[1],
+        'projectName': row[2],
+        'saturation': round(row[3], 1) if row[3] else 0,
+        'codeEquivalent': int(row[4]) if row[4] else 0,
+        'deliveredRequirements': int(row[5]) if row[5] else 0,
+        'totalHours': round(row[6], 1) if row[6] else 0,
+        'aiUsageDays': round(row[7], 1) if row[7] else 0
     } for row in results]
     
     return jsonify({'details': details})

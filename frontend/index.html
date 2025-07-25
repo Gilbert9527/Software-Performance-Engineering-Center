@@ -185,7 +185,86 @@
             <!-- 排行榜 -->
             <div id="rankings" class="dashboard-content">
                 <div class="rankings-container">
-                    <div class="ranking-list" id="developer-rankings"></div>
+                    <!-- 工作饱和度排行榜 -->
+                    <div class="ranking-section">
+                        <div class="ranking-header">
+                            <h3>工作饱和度排行榜</h3>
+                            <div class="ranking-controls">
+                                <button class="sort-btn active" data-sort="desc" data-type="saturation">
+                                    <span>降序</span>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M7 14l5-5 5 5z"/>
+                                    </svg>
+                                </button>
+                                <button class="sort-btn" data-sort="asc" data-type="saturation">
+                                    <span>升序</span>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M7 10l5 5 5-5z"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="ranking-legend">
+                            <span class="legend-item">排名</span>
+                            <span class="legend-item">人员</span>
+                            <span class="legend-item">饱和度(%)</span>
+                        </div>
+                        <div class="ranking-list" id="saturation-rankings"></div>
+                    </div>
+
+                    <!-- 代码当量排行榜 -->
+                    <div class="ranking-section">
+                        <div class="ranking-header">
+                            <h3>代码当量排行榜</h3>
+                            <div class="ranking-controls">
+                                <button class="sort-btn active" data-sort="desc" data-type="code">
+                                    <span>降序</span>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M7 14l5-5 5 5z"/>
+                                    </svg>
+                                </button>
+                                <button class="sort-btn" data-sort="asc" data-type="code">
+                                    <span>升序</span>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M7 10l5 5 5-5z"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="ranking-legend">
+                            <span class="legend-item">排名</span>
+                            <span class="legend-item">人员</span>
+                            <span class="legend-item">代码当量</span>
+                        </div>
+                        <div class="ranking-list" id="code-rankings"></div>
+                    </div>
+
+                    <!-- 缺陷数量排行榜 -->
+                    <div class="ranking-section">
+                        <div class="ranking-header">
+                            <h3>缺陷数量排行榜</h3>
+                            <div class="ranking-controls">
+                                <button class="sort-btn active" data-sort="asc" data-type="defects">
+                                    <span>升序</span>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M7 10l5 5 5-5z"/>
+                                    </svg>
+                                </button>
+                                <button class="sort-btn" data-sort="desc" data-type="defects">
+                                    <span>降序</span>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M7 14l5-5 5 5z"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="ranking-legend">
+                            <span class="legend-item">排名</span>
+                            <span class="legend-item">人员</span>
+                            <span class="legend-item">缺陷数(个)</span>
+                        </div>
+                        <div class="ranking-list" id="defects-rankings"></div>
+                    </div>
                 </div>
             </div>
 
@@ -196,12 +275,14 @@
                         <table id="details-table">
                             <thead>
                                 <tr>
+                                    <th>人员名称</th>
+                                    <th>职位名称</th>
                                     <th>项目名称</th>
-                                    <th>开发者</th>
-                                    <th>提交数</th>
-                                    <th>代码行数</th>
-                                    <th>Bug数量</th>
-                                    <th>完成时间</th>
+                                    <th>饱和度(%)</th>
+                                    <th>代码当量</th>
+                                    <th>交付需求数</th>
+                                    <th>总工时(h)</th>
+                                    <th>AI使用人天</th>
                                 </tr>
                             </thead>
                             <tbody id="details-tbody"></tbody>

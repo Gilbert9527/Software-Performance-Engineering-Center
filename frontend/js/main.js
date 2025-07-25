@@ -1,8 +1,16 @@
+// API基础URL配置
+const API_BASE_URL = 'http://localhost:5000';
+
 // 主要应用逻辑
 class EfficiencyPlatform {
     constructor() {
         this.currentTab = 'dashboard';
         this.currentDashboardTab = 'metrics';
+        this.rankingSortOrders = {
+            saturation: 'desc',
+            code: 'desc',
+            defects: 'asc'  // 缺陷数量默认升序（越少越好）
+        };
         this.filters = {
             department: 'all',
             date: ''
@@ -14,7 +22,6 @@ class EfficiencyPlatform {
         this.bindEvents();
         this.initFilters();
         this.loadInitialData();
-        // 移除：this.initStickyFilters();
     }
 
     bindEvents() {
@@ -32,6 +39,15 @@ class EfficiencyPlatform {
             btn.addEventListener('click', (e) => {
                 const tab = e.target.dataset.dashboardTab;
                 this.switchDashboardTab(tab);
+            });
+        });
+
+        // 排序切换 - 新的独立排行榜
+        document.querySelectorAll('.sort-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const order = e.target.dataset.sort;
+                const type = e.target.dataset.type;
+                this.switchSortOrder(type, order);
             });
         });
 
@@ -99,8 +115,53 @@ class EfficiencyPlatform {
         this.loadDashboardData(tab);
     }
 
+    // 排序切换方法 - 新的独立排行榜
+    switchSortOrder(type, order) {
+        this.rankingSortOrders[type] = order;
+        
+        // 更新对应类型的排序按钮状态
+        document.querySelectorAll(`.sort-btn[data-type="${type}"]`).forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.sort === order);
+        });
+        
+        // 重新加载对应类型的排行榜数据
+        this.loadSingleRankingData(type);
+    }
+
     async loadInitialData() {
+        await this.loadDepartments();
         await this.loadDashboardData('metrics');
+    }
+
+    async loadDepartments() {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/departments`);
+            const data = await response.json();
+            
+            const departmentFilter = document.getElementById('department-filter');
+            if (departmentFilter && data.departments) {
+                // 清空现有选项
+                departmentFilter.innerHTML = '';
+                
+                // 添加"全部部门"选项
+                const allOption = document.createElement('option');
+                allOption.value = 'all';
+                allOption.textContent = '全部部门';
+                departmentFilter.appendChild(allOption);
+                
+                // 添加其他部门选项
+                data.departments.forEach(dept => {
+                    if (dept !== '全部部门') {
+                        const option = document.createElement('option');
+                        option.value = dept;
+                        option.textContent = dept;
+                        departmentFilter.appendChild(option);
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('加载部门列表失败:', error);
+        }
     }
 
     async loadTabData(tab) {
@@ -129,7 +190,7 @@ class EfficiencyPlatform {
             }
             
             const queryString = params.toString();
-            const url = `/api/dashboard/${tab}${queryString ? '?' + queryString : ''}`;
+            const url = `${API_BASE_URL}/api/dashboard/${tab}${queryString ? '?' + queryString : ''}`;
             
             const response = await fetch(url);
             const data = await response.json();
@@ -154,8 +215,172 @@ class EfficiencyPlatform {
         }
     }
 
+    // 加载所有排行榜数据
+    async loadAllRankingsData() {
+        await Promise.all([
+            this.loadSingleRankingData('saturation'),
+            this.loadSingleRankingData('code'),
+            this.loadSingleRankingData('defects')
+        ]);
+    }
+
+    // 加载单个排行榜数据
+    async loadSingleRankingData(type) {
+        try {
+            const params = new URLSearchParams();
+            if (this.filters.department && this.filters.department !== 'all') {
+                params.append('department', this.filters.department);
+            }
+            if (this.filters.date) {
+                params.append('date', this.filters.date);
+            }
+            params.append('type', type);
+            params.append('sort', this.rankingSortOrders[type]);
+            
+            const queryString = params.toString();
+            const url = `${API_BASE_URL}/api/dashboard/rankings${queryString ? '?' + queryString : ''}`;
+            
+            const response = await fetch(url);
+            const data = await response.json();
+            
+            this.updateSingleRanking(type, data);
+        } catch (error) {
+            console.error(`加载${type}排行榜数据失败:`, error);
+            this.showErrorMessage(`${type}排行榜数据加载失败，请稍后重试`);
+        }
+    }
+
+    updateMetrics(data) {
+        // 更新各项指标数据
+        const elements = {
+            'requirement-throughput': data.requirementThroughput || '--',
+            'monthly-delivered-requirements': data.monthlyDeliveredRequirements || '--',
+            'monthly-new-requirements': data.monthlyNewRequirements || '--',
+            'delivery-cycle-p75': data.deliveryCycleP75 || '--',
+            'online-defects': data.onlineDefects || '--',
+            'reopen-rate': (data.reopenRate || '--') + (data.reopenRate ? '%' : ''),
+            'emergency-releases': data.emergencyReleases || '--',
+            'incident-count': data.incidentCount || '--',
+            'work-saturation': (data.workSaturation || '--') + (data.workSaturation ? '%' : ''),
+            'code-equivalent': data.codeEquivalent || '--'
+        };
+
+        Object.entries(elements).forEach(([id, value]) => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.textContent = value;
+            }
+        });
+    }
+
+    updateTrends(data) {
+        // 趋势图表更新逻辑
+        console.log('更新趋势数据:', data);
+    }
+
+    // 更新所有排行榜（兼容旧版本）
+    updateRankings(data) {
+        // 当切换到排行榜标签时，加载所有排行榜数据
+        this.loadAllRankingsData();
+    }
+
+    // 更新单个排行榜
+    updateSingleRanking(type, data) {
+        const container = document.getElementById(`${type}-rankings`);
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        if (data.rankings && data.rankings.length > 0) {
+            data.rankings.forEach((item, index) => {
+                const rankItem = document.createElement('div');
+                rankItem.className = 'rank-item';
+                
+                let valueDisplay = item.value;
+                if (type === 'saturation') {
+                    valueDisplay = `${item.value}%`;
+                } else if (type === 'code') {
+                    valueDisplay = `${item.value}行`;
+                } else if (type === 'defects') {
+                    valueDisplay = `${item.value}个`;
+                }
+                
+                rankItem.innerHTML = `
+                    <span class="rank">${index + 1}</span>
+                    <span class="name">${item.name}</span>
+                    <span class="value">${valueDisplay}</span>
+                `;
+                container.appendChild(rankItem);
+            });
+        } else {
+            container.innerHTML = '<div class="no-data">暂无数据</div>';
+        }
+    }
+
+    updateDetails(data) {
+        const tbody = document.getElementById('details-tbody');
+        tbody.innerHTML = '';
+        
+        if (data.details) {
+            data.details.forEach(item => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${item.personName}</td>
+                    <td>${item.positionName}</td>
+                    <td>${item.projectName}</td>
+                    <td>${item.saturation}%</td>
+                    <td>${item.codeEquivalent}</td>
+                    <td>${item.deliveredRequirements}</td>
+                    <td>${item.totalHours}h</td>
+                    <td>${item.aiUsageDays}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+    }
+
+    async loadAIAnalysis() {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/ai-analysis`);
+            const data = await response.json();
+            const aiResults = document.getElementById('ai-results');
+            if (aiResults) {
+                aiResults.innerHTML = data.analysis || 'AI分析结果将在这里显示...';
+            }
+        } catch (error) {
+            console.error('加载AI分析失败:', error);
+        }
+    }
+
+    async loadSettings() {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/settings`);
+            const data = await response.json();
+            
+            const refreshInterval = document.getElementById('refresh-interval');
+            const emailNotifications = document.getElementById('email-notifications');
+            
+            if (refreshInterval && data.refreshInterval) {
+                refreshInterval.value = data.refreshInterval;
+            }
+            if (emailNotifications && data.emailNotifications !== undefined) {
+                emailNotifications.checked = data.emailNotifications;
+            }
+        } catch (error) {
+            console.error('加载设置失败:', error);
+        }
+    }
+
+    // 应用筛选条件
+    applyFilters() {
+        // 重新加载当前标签的数据
+        this.loadDashboardData(this.currentDashboardTab);
+        
+        // 显示筛选应用成功提示
+        this.showSuccessMessage('筛选条件已应用');
+    }
+
     showErrorMessage(message) {
-        // 显示错误提示
         const errorDiv = document.createElement('div');
         errorDiv.className = 'error-message';
         errorDiv.textContent = message;
@@ -177,15 +402,6 @@ class EfficiencyPlatform {
         setTimeout(() => {
             errorDiv.remove();
         }, 3000);
-    }
-
-    // 应用筛选条件
-    applyFilters() {
-        // 重新加载当前标签的数据
-        this.loadDashboardData(this.currentDashboardTab);
-        
-        // 显示筛选应用成功提示
-        this.showSuccessMessage('筛选条件已应用');
     }
 
     showSuccessMessage(message) {
@@ -211,98 +427,24 @@ class EfficiencyPlatform {
             successDiv.remove();
         }, 2000);
     }
-
-    updateMetrics(data) {
-        document.getElementById('commit-count').textContent = data.commitCount || '--';
-        document.getElementById('bug-fix-rate').textContent = (data.bugFixRate || '--') + '%';
-        document.getElementById('code-quality').textContent = data.codeQuality || '--';
-        document.getElementById('delivery-efficiency').textContent = (data.deliveryEfficiency || '--') + '%';
-    }
-
-    updateTrends(data) {
-        // 趋势图表更新逻辑
-        console.log('更新趋势数据:', data);
-    }
-
-    updateRankings(data) {
-        const container = document.getElementById('developer-rankings');
-        container.innerHTML = '';
-        
-        if (data.rankings) {
-            data.rankings.forEach((item, index) => {
-                const rankItem = document.createElement('div');
-                rankItem.className = 'rank-item';
-                rankItem.innerHTML = `
-                    <span class="rank">${index + 1}</span>
-                    <span class="name">${item.name}</span>
-                    <span class="score">${item.score}</span>
-                `;
-                container.appendChild(rankItem);
-            });
-        }
-    }
-
-    updateDetails(data) {
-        const tbody = document.getElementById('details-tbody');
-        tbody.innerHTML = '';
-        
-        if (data.details) {
-            data.details.forEach(item => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${item.projectName}</td>
-                    <td>${item.developer}</td>
-                    <td>${item.commits}</td>
-                    <td>${item.codeLines}</td>
-                    <td>${item.bugs}</td>
-                    <td>${item.completionTime}</td>
-                `;
-                tbody.appendChild(row);
-            });
-        }
-    }
-
-    async loadAIAnalysis() {
-        try {
-            const response = await fetch('/api/ai-analysis');
-            const data = await response.json();
-            document.getElementById('ai-results').innerHTML = data.analysis || 'AI分析结果将在这里显示...';
-        } catch (error) {
-            console.error('加载AI分析失败:', error);
-        }
-    }
-
-    async loadSettings() {
-        try {
-            const response = await fetch('/api/settings');
-            const data = await response.json();
-            
-            if (data.refreshInterval) {
-                document.getElementById('refresh-interval').value = data.refreshInterval;
-            }
-            if (data.emailNotifications !== undefined) {
-                document.getElementById('email-notifications').checked = data.emailNotifications;
-            }
-        } catch (error) {
-            console.error('加载设置失败:', error);
-        }
-    }
 }
 
 // 保存设置函数
 async function saveSettings() {
-    const refreshInterval = document.getElementById('refresh-interval').value;
-    const emailNotifications = document.getElementById('email-notifications').checked;
+    const refreshInterval = document.getElementById('refresh-interval');
+    const emailNotifications = document.getElementById('email-notifications');
+    
+    if (!refreshInterval || !emailNotifications) return;
     
     try {
-        const response = await fetch('/api/settings', {
+        const response = await fetch(`${API_BASE_URL}/api/settings`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                refreshInterval,
-                emailNotifications
+                refreshInterval: refreshInterval.value,
+                emailNotifications: emailNotifications.checked
             })
         });
         
@@ -322,58 +464,27 @@ function applyFilters() {
     }
 }
 
-// 初始化应用
-document.addEventListener('DOMContentLoaded', () => {
-    window.efficiencyPlatform = new EfficiencyPlatform();
-});
-
-// 在main.js中添加重置功能
+// 重置筛选条件
 function resetFilters() {
-    // 重置部门筛选为默认值
     const departmentFilter = document.getElementById('department-filter');
-    departmentFilter.value = 'all';
-    
-    // 重置日期筛选为当前月份
     const dateFilter = document.getElementById('date-filter');
-    const currentDate = new Date();
-    const currentMonth = currentDate.getFullYear() + '-' + String(currentDate.getMonth() + 1).padStart(2, '0');
-    dateFilter.value = currentMonth;
     
-    // 自动应用默认筛选条件
-    applyFilters();
+    if (departmentFilter) {
+        departmentFilter.value = 'all';
+    }
     
-    // 显示重置成功提示
-    showMessage('筛选条件已重置', 'success');
-}
-
-// 修改应用筛选函数名称显示
-function applyFilters() {
-    const department = document.getElementById('department-filter').value;
-    const date = document.getElementById('date-filter').value;
+    if (dateFilter) {
+        const currentDate = new Date();
+        const currentMonth = currentDate.getFullYear() + '-' + String(currentDate.getMonth() + 1).padStart(2, '0');
+        dateFilter.value = currentMonth;
+    }
     
-    // 显示加载状态
-    const applyBtn = document.querySelector('.filter-apply-btn');
-    const originalText = applyBtn.textContent;
-    applyBtn.textContent = '筛选中...';
-    applyBtn.disabled = true;
-    
-    // 应用筛选逻辑
-    const platform = new EfficiencyPlatform();
-    platform.applyFilters(department, date).then(() => {
-        // 恢复按钮状态
-        applyBtn.textContent = originalText;
-        applyBtn.disabled = false;
-        
-        // 显示成功提示
-        showMessage('筛选条件已应用', 'success');
-    }).catch(() => {
-        // 恢复按钮状态
-        applyBtn.textContent = originalText;
-        applyBtn.disabled = false;
-        
-        // 显示错误提示
-        showMessage('筛选失败，请重试', 'error');
-    });
+    // 更新平台实例的筛选条件
+    if (window.efficiencyPlatform) {
+        window.efficiencyPlatform.filters.department = 'all';
+        window.efficiencyPlatform.filters.date = dateFilter ? dateFilter.value : '';
+        window.efficiencyPlatform.applyFilters();
+    }
 }
 
 // 主题切换功能
@@ -477,33 +588,8 @@ function toggleTheme() {
     }
 }
 
-// 初始化主题管理器
+// 初始化应用
 document.addEventListener('DOMContentLoaded', () => {
+    window.efficiencyPlatform = new EfficiencyPlatform();
     window.themeManager = new ThemeManager();
 });
-
-// 移除整个initStickyFilters方法
-// initStickyFilters() {
-//     const filtersElement = document.querySelector('.dashboard-filters');
-//     if (!filtersElement) return;
-//
-//     const observer = new IntersectionObserver(
-//         (entries) => {
-//             entries.forEach(entry => {
-//                 if (entry.isIntersecting) {
-//                     // 筛选框完全可见时移除sticky样式
-//                     filtersElement.classList.remove('sticky');
-//                 } else {
-//                     // 筛选框部分或完全不可见时添加sticky样式
-//                     filtersElement.classList.add('sticky');
-//                 }
-//             });
-//         },
-//         {
-//             threshold: [0.9], // 当90%可见时触发
-//             rootMargin: '-70px 0px 0px 0px' // 考虑导航栏高度
-//         }
-//     );
-//
-//     observer.observe(filtersElement);
-
