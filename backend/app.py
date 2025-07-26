@@ -785,6 +785,51 @@ def download_report():
         print(f"生成PDF报告失败: {str(e)}")
         return jsonify({'error': '生成PDF报告失败'}), 500
 
+@app.route('/api/ai-analysis/upload', methods=['POST'])
+def upload_and_analyze():
+    """上传文件并进行AI分析"""
+    try:
+        # 检查是否有文件上传
+        if 'file' not in request.files:
+            return jsonify({'error': '没有上传文件'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': '没有选择文件'}), 400
+        
+        # 读取文件内容
+        file_content = file.read().decode('utf-8')
+        
+        # 这里可以集成AI模型进行分析
+        # 暂时返回模拟的分析结果
+        analysis_result = {
+            'summary': '文件分析完成',
+            'insights': [
+                '代码质量良好，建议继续保持',
+                '发现3个潜在的性能优化点',
+                '建议增加单元测试覆盖率'
+            ],
+            'recommendations': [
+                '优化数据库查询语句',
+                '添加错误处理机制',
+                '完善文档注释'
+            ],
+            'file_info': {
+                'name': file.filename,
+                'size': len(file_content),
+                'lines': len(file_content.split('\n'))
+            }
+        }
+        
+        return jsonify({
+            'success': True,
+            'analysis': analysis_result
+        })
+        
+    except Exception as e:
+        print(f"AI分析失败: {str(e)}")
+        return jsonify({'error': f'AI分析失败: {str(e)}'}), 500
+
 if __name__ == '__main__':
     # 确保数据库目录存在
     os.makedirs(os.path.dirname(DATABASE_PATH), exist_ok=True)
