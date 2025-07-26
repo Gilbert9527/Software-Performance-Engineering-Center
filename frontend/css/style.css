@@ -48,6 +48,25 @@
   --apple-radius-xl: 16px;
   --apple-radius-2xl: 20px;
   
+  /* 设置页面专用变量 */
+  --primary-color: var(--apple-blue);
+  --primary-hover: var(--apple-blue-dark);
+  --card-background: var(--apple-white);
+  --border-color: var(--apple-gray-300);
+  --text-primary: var(--apple-gray-900);
+  --text-secondary: var(--apple-gray-600);
+  --input-background: var(--apple-white);
+  --secondary-background: var(--apple-gray-50);
+  --hover-background: var(--apple-gray-100);
+  
+  /* 深色主题变量 */
+  --dark-card-background: var(--apple-gray-800);
+  --dark-border-color: var(--apple-gray-600);
+  --dark-text-primary: var(--apple-gray-100);
+  --dark-input-background: var(--apple-gray-700);
+  --dark-secondary-background: var(--apple-gray-700);
+  --dark-hover-background: var(--apple-gray-600);
+  
   /* 过渡动画 */
   --apple-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   --apple-transition-fast: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);

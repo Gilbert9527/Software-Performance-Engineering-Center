@@ -1,0 +1,19 @@
+{
+  "siliconflow": {
+    "api_key": "sk-cgeodmtqtwhrrcaqppopyblkvfwcggowlqryvqwyhoivfiub",
+    "base_url": "https://api.siliconflow.cn/v1",
+    "model": "Qwen/Qwen2.5-7B-Instruct",
+    "max_tokens": 2000,
+    "temperature": 0.7,
+    "timeout": 120
+  },
+  "file_processing": {
+    "max_file_size": 5242880,
+    "supported_formats": ["pdf", "md", "xlsx", "xls", "docx", "doc", "txt"],
+    "temp_dir": "temp/uploads"
+  },
+  "prompts": {
+    "default": "请分析以下文档内容，提供详细的分析报告，包括主要内容总结、关键信息提取和建议。",
+    "custom": null
+  }
+}

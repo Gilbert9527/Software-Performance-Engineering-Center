@@ -18,12 +18,43 @@ import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('Agg')  # 使用非交互式后端
 import numpy as np
+import uuid
+import threading
+import time
+
+# Import AI analysis services
+from services.config_manager import ConfigManager
+from services.file_handler import FileUploadHandler
+from services.content_extractor import ContentExtractor
+from services.siliconflow_client import SiliconFlowClient
+from services.report_generator import ReportGenerator
 
 app = Flask(__name__)
 CORS(app)
 
 # 数据库配置
 DATABASE_PATH = os.path.join(os.path.dirname(__file__), '..', 'database', 'efficiency.db')
+
+# Initialize AI analysis services
+config_manager = ConfigManager()
+file_handler = FileUploadHandler(config_manager)
+content_extractor = ContentExtractor()
+report_generator = ReportGenerator()
+
+# Initialize SiliconFlow client
+try:
+    siliconflow_config = config_manager.get_siliconflow_config()
+    siliconflow_client = SiliconFlowClient(
+        api_key=siliconflow_config['api_key'],
+        base_url=siliconflow_config['base_url'],
+        model=siliconflow_config['model'],
+        max_tokens=siliconflow_config.get('max_tokens', 2000),
+        temperature=siliconflow_config.get('temperature', 0.7),
+        timeout=siliconflow_config.get('timeout', 120)
+    )
+except Exception as e:
+    print(f"Warning: Failed to initialize SiliconFlow client: {e}")
+    siliconflow_client = None
 
 # 静态文件服务
 @app.route('/')
@@ -107,6 +138,39 @@ def init_database():
             refresh_interval INTEGER,
             email_notifications INTEGER,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # AI Analysis Module Tables
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS ai_analysis_files (
+            id TEXT PRIMARY KEY,
+            filename TEXT NOT NULL,
+            file_type TEXT NOT NULL,
+            file_size INTEGER NOT NULL,
+            upload_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            status TEXT DEFAULT 'uploaded'
+        )
+    ''')
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS ai_analysis_results (
+            id TEXT PRIMARY KEY,
+            file_id TEXT NOT NULL,
+            analysis_text TEXT NOT NULL,
+            prompt_used TEXT,
+            processing_time REAL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (file_id) REFERENCES ai_analysis_files (id)
+        )
+    ''')
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS ai_config (
+            id INTEGER PRIMARY KEY,
+            api_key TEXT NOT NULL,
+            custom_prompt TEXT,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
     
@@ -788,47 +852,618 @@ def download_report():
 @app.route('/api/ai-analysis/upload', methods=['POST'])
 def upload_and_analyze():
     """上传文件并进行AI分析"""
+    if not siliconflow_client:
+        return jsonify({'error': 'AI分析服务未初始化'}), 500
+    
     try:
         # 检查是否有文件上传
         if 'file' not in request.files:
             return jsonify({'error': '没有上传文件'}), 400
         
         file = request.files['file']
-        if file.filename == '':
+        if not file or file.filename == '':
             return jsonify({'error': '没有选择文件'}), 400
         
-        # 读取文件内容
-        file_content = file.read().decode('utf-8')
+        # 获取自定义提示词（可选）
+        custom_prompt = request.form.get('custom_prompt', '').strip()
+        if not custom_prompt:
+            custom_prompt = config_manager.get_effective_prompt()
         
-        # 这里可以集成AI模型进行分析
-        # 暂时返回模拟的分析结果
-        analysis_result = {
-            'summary': '文件分析完成',
-            'insights': [
-                '代码质量良好，建议继续保持',
-                '发现3个潜在的性能优化点',
-                '建议增加单元测试覆盖率'
-            ],
-            'recommendations': [
-                '优化数据库查询语句',
-                '添加错误处理机制',
-                '完善文档注释'
-            ],
+        # 1. 验证文件
+        validation_result = file_handler.validate_file(file)
+        if not validation_result.is_valid:
+            return jsonify({'error': validation_result.error_message}), 400
+        
+        # 2. 保存临时文件
+        file_id, temp_file_path = file_handler.save_temp_file(file)
+        
+        try:
+            # 3. 提取文件内容
+            extraction_result = content_extractor.extract_content(
+                temp_file_path, 
+                validation_result.file_type
+            )
+            
+            if not extraction_result.success:
+                return jsonify({'error': f'文件内容提取失败: {extraction_result.error_message}'}), 422
+            
+            # 4. AI分析
+            analysis_result = siliconflow_client.analyze_content(
+                extraction_result.content, 
+                custom_prompt
+            )
+            
+            if not analysis_result.success:
+                return jsonify({'error': f'AI分析失败: {analysis_result.error_message}'}), 500
+            
+            # 5. 生成分析ID并保存到数据库
+            analysis_id = str(uuid.uuid4())
+            
+            # 保存文件信息到数据库
+            conn = sqlite3.connect(DATABASE_PATH)
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                INSERT INTO ai_analysis_files (id, filename, file_type, file_size, upload_timestamp, status)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (file_id, file.filename, validation_result.file_type, 
+                  validation_result.file_size, datetime.now(), 'completed'))
+            
+            # 保存分析结果到数据库
+            cursor.execute('''
+                INSERT INTO ai_analysis_results (id, file_id, analysis_text, prompt_used, processing_time, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (analysis_id, file_id, analysis_result.content, custom_prompt,
+                  analysis_result.processing_time, datetime.now()))
+            
+            conn.commit()
+            conn.close()
+            
+            # 6. 生成报告
+            file_metadata = {
+                'filename': file.filename,
+                'file_type': validation_result.file_type,
+                'file_size': validation_result.file_size,
+                'upload_time': datetime.now().isoformat(),
+                'prompt_used': custom_prompt,
+                'extraction_metadata': extraction_result.metadata
+            }
+            
+            report = report_generator.generate_report(
+                analysis_result, 
+                file_metadata, 
+                analysis_id
+            )
+            
+            # 7. 清理临时文件
+            file_handler.cleanup_temp_file(temp_file_path)
+            
+            # 8. 返回结果
+            return jsonify({
+                'success': True,
+                'file_id': file_id,
+                'analysis_id': analysis_id,
+                'status': 'completed',
+                'report': report_generator.format_json_report(report)
+            })
+            
+        finally:
+            # 确保清理临时文件
+            file_handler.cleanup_temp_file(temp_file_path)
+            
+    except Exception as e:
+        print(f"AI分析失败: {str(e)}")
+        return jsonify({'error': f'AI分析失败: {str(e)}'}), 500
+
+
+@app.route('/api/ai-analysis/results/<analysis_id>')
+def get_analysis_result(analysis_id):
+    """获取分析结果"""
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        # 获取分析结果和文件信息
+        cursor.execute('''
+            SELECT r.id, r.file_id, r.analysis_text, r.prompt_used, r.processing_time, r.created_at,
+                   f.filename, f.file_type, f.file_size, f.upload_timestamp
+            FROM ai_analysis_results r
+            JOIN ai_analysis_files f ON r.file_id = f.id
+            WHERE r.id = ?
+        ''', (analysis_id,))
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        if not result:
+            return jsonify({'error': '分析结果不存在'}), 404
+        
+        # 构建响应数据
+        response_data = {
+            'id': result[0],
             'file_info': {
-                'name': file.filename,
-                'size': len(file_content),
-                'lines': len(file_content.split('\n'))
+                'filename': result[6],
+                'file_type': result[7],
+                'file_size': result[8],
+                'upload_time': result[9]
+            },
+            'analysis': {
+                'content': result[2],
+                'prompt_used': result[3],
+                'processing_time': result[4],
+                'created_at': result[5]
+            },
+            'status': 'completed'
+        }
+        
+        return jsonify(response_data)
+        
+    except Exception as e:
+        print(f"获取分析结果失败: {str(e)}")
+        return jsonify({'error': f'获取分析结果失败: {str(e)}'}), 500
+
+
+@app.route('/api/ai-analysis/history')
+def get_analysis_history():
+    """获取分析历史"""
+    try:
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 10))
+        offset = (page - 1) * per_page
+        
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        # 获取总数
+        cursor.execute('SELECT COUNT(*) FROM ai_analysis_results')
+        total = cursor.fetchone()[0]
+        
+        # 获取分页数据
+        cursor.execute('''
+            SELECT r.id, r.file_id, r.processing_time, r.created_at,
+                   f.filename, f.file_type, f.file_size
+            FROM ai_analysis_results r
+            JOIN ai_analysis_files f ON r.file_id = f.id
+            ORDER BY r.created_at DESC
+            LIMIT ? OFFSET ?
+        ''', (per_page, offset))
+        
+        results = cursor.fetchall()
+        conn.close()
+        
+        # 构建响应数据
+        history_items = []
+        for result in results:
+            history_items.append({
+                'id': result[0],
+                'file_id': result[1],
+                'filename': result[4],
+                'file_type': result[5],
+                'file_size': result[6],
+                'processing_time': result[2],
+                'created_at': result[3]
+            })
+        
+        return jsonify({
+            'items': history_items,
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': total,
+                'pages': (total + per_page - 1) // per_page
+            }
+        })
+        
+    except Exception as e:
+        print(f"获取分析历史失败: {str(e)}")
+        return jsonify({'error': f'获取分析历史失败: {str(e)}'}), 500
+
+
+@app.route('/api/ai-analysis/results/<analysis_id>', methods=['DELETE'])
+def delete_analysis_result(analysis_id):
+    """删除分析结果"""
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        # 检查分析结果是否存在
+        cursor.execute('SELECT file_id FROM ai_analysis_results WHERE id = ?', (analysis_id,))
+        result = cursor.fetchone()
+        
+        if not result:
+            conn.close()
+            return jsonify({'error': '分析结果不存在'}), 404
+        
+        file_id = result[0]
+        
+        # 删除分析结果
+        cursor.execute('DELETE FROM ai_analysis_results WHERE id = ?', (analysis_id,))
+        
+        # 检查是否还有其他分析结果使用同一个文件
+        cursor.execute('SELECT COUNT(*) FROM ai_analysis_results WHERE file_id = ?', (file_id,))
+        count = cursor.fetchone()[0]
+        
+        # 如果没有其他分析结果使用该文件，则删除文件记录
+        if count == 0:
+            cursor.execute('DELETE FROM ai_analysis_files WHERE id = ?', (file_id,))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'success': True, 'message': '分析结果已删除'})
+        
+    except Exception as e:
+        print(f"删除分析结果失败: {str(e)}")
+        return jsonify({'error': f'删除分析结果失败: {str(e)}'}), 500
+
+
+@app.route('/api/ai-analysis/config', methods=['GET'])
+def get_ai_config():
+    """获取AI分析配置"""
+    try:
+        # 获取当前配置
+        config_data = {
+            'siliconflow': {
+                'model': config_manager.get_siliconflow_config().get('model', 'Qwen/Qwen2.5-7B-Instruct'),
+                'max_tokens': config_manager.get_siliconflow_config().get('max_tokens', 2000),
+                'temperature': config_manager.get_siliconflow_config().get('temperature', 0.7),
+                'timeout': config_manager.get_siliconflow_config().get('timeout', 120),
+                'base_url': config_manager.get_siliconflow_config().get('base_url', 'https://api.siliconflow.cn/v1')
+            },
+            'file_processing': {
+                'max_file_size': config_manager.get_max_file_size(),
+                'supported_formats': config_manager.get_supported_formats()
+            },
+            'prompts': {
+                'default': config_manager.get_default_prompt(),
+                'custom': config_manager.get_custom_prompt()
             }
         }
         
         return jsonify({
             'success': True,
-            'analysis': analysis_result
+            'config': config_data
         })
         
     except Exception as e:
-        print(f"AI分析失败: {str(e)}")
-        return jsonify({'error': f'AI分析失败: {str(e)}'}), 500
+        print(f"获取配置失败: {str(e)}")
+        return jsonify({'error': f'获取配置失败: {str(e)}'}), 500
+
+
+@app.route('/api/ai-analysis/config', methods=['POST'])
+def update_ai_config():
+    """更新AI分析配置"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': '没有提供配置数据'}), 400
+        
+        # 目前只支持更新自定义提示词
+        if 'custom_prompt' in data:
+            custom_prompt = data['custom_prompt']
+            if custom_prompt:
+                config_manager.set_custom_prompt(custom_prompt)
+            else:
+                config_manager.clear_custom_prompt()
+        
+        return jsonify({
+            'success': True,
+            'message': '配置更新成功'
+        })
+        
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        print(f"更新配置失败: {str(e)}")
+        return jsonify({'error': f'更新配置失败: {str(e)}'}), 500
+
+
+@app.route('/api/ai-analysis/config/prompt', methods=['PUT'])
+def update_custom_prompt():
+    """更新自定义提示词"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': '没有提供数据'}), 400
+        
+        custom_prompt = data.get('prompt', '').strip()
+        
+        if custom_prompt:
+            config_manager.set_custom_prompt(custom_prompt)
+            message = '自定义提示词设置成功'
+        else:
+            config_manager.clear_custom_prompt()
+            message = '自定义提示词已清除，将使用默认提示词'
+        
+        return jsonify({
+            'success': True,
+            'message': message,
+            'effective_prompt': config_manager.get_effective_prompt()
+        })
+        
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        print(f"更新提示词失败: {str(e)}")
+        return jsonify({'error': f'更新提示词失败: {str(e)}'}), 500
+
+
+@app.route('/api/ai-analysis/config/test', methods=['POST'])
+def test_ai_connection():
+    """测试AI服务连接"""
+    try:
+        if not siliconflow_client:
+            return jsonify({
+                'success': False,
+                'error': 'AI客户端未初始化'
+            }), 500
+        
+        # 测试连接
+        test_result = siliconflow_client.test_connection()
+        
+        return jsonify({
+            'success': test_result['success'],
+            'test_result': test_result
+        })
+        
+    except Exception as e:
+        print(f"测试连接失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'测试连接失败: {str(e)}'
+        }), 500
+
+
+@app.route('/api/ai-analysis/config/validate', methods=['GET'])
+def validate_ai_config():
+    """验证AI分析配置"""
+    try:
+        validation_result = config_manager.validate_configuration()
+        
+        return jsonify({
+            'success': True,
+            'validation': validation_result
+        })
+        
+    except Exception as e:
+        print(f"配置验证失败: {str(e)}")
+        return jsonify({'error': f'配置验证失败: {str(e)}'}), 500
+
+
+@app.route('/api/ai-analysis/files')
+def get_analysis_files():
+    """获取分析文件列表"""
+    try:
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 20))
+        file_type = request.args.get('file_type', '')
+        offset = (page - 1) * per_page
+        
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        # 构建查询条件
+        where_clause = "1=1"
+        params = []
+        
+        if file_type:
+            where_clause += " AND file_type = ?"
+            params.append(file_type)
+        
+        # 获取总数
+        cursor.execute(f'SELECT COUNT(*) FROM ai_analysis_files WHERE {where_clause}', params)
+        total = cursor.fetchone()[0]
+        
+        # 获取分页数据
+        cursor.execute(f'''
+            SELECT id, filename, file_type, file_size, upload_timestamp, status
+            FROM ai_analysis_files 
+            WHERE {where_clause}
+            ORDER BY upload_timestamp DESC
+            LIMIT ? OFFSET ?
+        ''', params + [per_page, offset])
+        
+        results = cursor.fetchall()
+        conn.close()
+        
+        # 构建响应数据
+        files = []
+        for result in results:
+            files.append({
+                'id': result[0],
+                'filename': result[1],
+                'file_type': result[2],
+                'file_size': result[3],
+                'upload_timestamp': result[4],
+                'status': result[5]
+            })
+        
+        return jsonify({
+            'files': files,
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': total,
+                'pages': (total + per_page - 1) // per_page
+            }
+        })
+        
+    except Exception as e:
+        print(f"获取文件列表失败: {str(e)}")
+        return jsonify({'error': f'获取文件列表失败: {str(e)}'}), 500
+
+
+@app.route('/api/ai-analysis/files/<file_id>', methods=['DELETE'])
+def delete_analysis_file(file_id):
+    """删除分析文件及其相关的所有分析结果"""
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        # 检查文件是否存在
+        cursor.execute('SELECT filename FROM ai_analysis_files WHERE id = ?', (file_id,))
+        result = cursor.fetchone()
+        
+        if not result:
+            conn.close()
+            return jsonify({'error': '文件不存在'}), 404
+        
+        filename = result[0]
+        
+        # 删除相关的分析结果
+        cursor.execute('DELETE FROM ai_analysis_results WHERE file_id = ?', (file_id,))
+        deleted_results = cursor.rowcount
+        
+        # 删除文件记录
+        cursor.execute('DELETE FROM ai_analysis_files WHERE id = ?', (file_id,))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f'文件 "{filename}" 及其 {deleted_results} 个分析结果已删除'
+        })
+        
+    except Exception as e:
+        print(f"删除文件失败: {str(e)}")
+        return jsonify({'error': f'删除文件失败: {str(e)}'}), 500
+
+
+@app.route('/api/ai-analysis/stats')
+def get_analysis_stats():
+    """获取分析统计信息"""
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        # 总文件数
+        cursor.execute('SELECT COUNT(*) FROM ai_analysis_files')
+        total_files = cursor.fetchone()[0]
+        
+        # 总分析数
+        cursor.execute('SELECT COUNT(*) FROM ai_analysis_results')
+        total_analyses = cursor.fetchone()[0]
+        
+        # 按文件类型统计
+        cursor.execute('''
+            SELECT file_type, COUNT(*) 
+            FROM ai_analysis_files 
+            GROUP BY file_type 
+            ORDER BY COUNT(*) DESC
+        ''')
+        file_type_stats = [{'type': row[0], 'count': row[1]} for row in cursor.fetchall()]
+        
+        # 最近7天的分析数量
+        cursor.execute('''
+            SELECT DATE(created_at) as date, COUNT(*) as count
+            FROM ai_analysis_results 
+            WHERE created_at >= datetime('now', '-7 days')
+            GROUP BY DATE(created_at)
+            ORDER BY date DESC
+        ''')
+        recent_analyses = [{'date': row[0], 'count': row[1]} for row in cursor.fetchall()]
+        
+        # 平均处理时间
+        cursor.execute('SELECT AVG(processing_time) FROM ai_analysis_results WHERE processing_time IS NOT NULL')
+        avg_processing_time = cursor.fetchone()[0] or 0
+        
+        # 成功率（假设所有记录都是成功的，因为失败的不会保存到数据库）
+        success_rate = 100.0 if total_analyses > 0 else 0
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'stats': {
+                'total_files': total_files,
+                'total_analyses': total_analyses,
+                'file_type_distribution': file_type_stats,
+                'recent_analyses': recent_analyses,
+                'average_processing_time': round(avg_processing_time, 2),
+                'success_rate': success_rate
+            }
+        })
+        
+    except Exception as e:
+        print(f"获取统计信息失败: {str(e)}")
+        return jsonify({'error': f'获取统计信息失败: {str(e)}'}), 500
+
+
+@app.route('/api/ai-analysis/export/<analysis_id>')
+def export_analysis_report(analysis_id):
+    """导出分析报告"""
+    try:
+        format_type = request.args.get('format', 'html')  # html, json, summary
+        
+        if format_type not in ['html', 'json', 'summary']:
+            return jsonify({'error': '不支持的导出格式'}), 400
+        
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        # 获取分析结果和文件信息
+        cursor.execute('''
+            SELECT r.id, r.file_id, r.analysis_text, r.prompt_used, r.processing_time, r.created_at,
+                   f.filename, f.file_type, f.file_size, f.upload_timestamp
+            FROM ai_analysis_results r
+            JOIN ai_analysis_files f ON r.file_id = f.id
+            WHERE r.id = ?
+        ''', (analysis_id,))
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        if not result:
+            return jsonify({'error': '分析结果不存在'}), 404
+        
+        # 构建分析结果对象
+        from services.siliconflow_client import AnalysisResult
+        analysis_result = AnalysisResult(
+            success=True,
+            content=result[2],
+            processing_time=result[4]
+        )
+        
+        # 构建文件元数据
+        file_metadata = {
+            'filename': result[6],
+            'file_type': result[7],
+            'file_size': result[8],
+            'upload_time': result[9],
+            'prompt_used': result[3]
+        }
+        
+        # 生成报告
+        report = report_generator.generate_report(
+            analysis_result, 
+            file_metadata, 
+            analysis_id
+        )
+        
+        # 导出报告
+        exported_content = report_generator.export_report(report, format_type)
+        
+        # 设置响应头
+        if format_type == 'html':
+            response = app.response_class(
+                exported_content,
+                mimetype='text/html',
+                headers={'Content-Disposition': f'attachment; filename=analysis_report_{analysis_id}.html'}
+            )
+        else:  # json or summary
+            response = app.response_class(
+                exported_content,
+                mimetype='application/json',
+                headers={'Content-Disposition': f'attachment; filename=analysis_report_{analysis_id}.json'}
+            )
+        
+        return response
+        
+    except Exception as e:
+        print(f"导出报告失败: {str(e)}")
+        return jsonify({'error': f'导出报告失败: {str(e)}'}), 500
+
 
 if __name__ == '__main__':
     # 确保数据库目录存在

@@ -7,6 +7,7 @@
     <title>研发效能管理平台</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/ai-analysis.css">
 </head>
 
 <body>
@@ -297,38 +298,188 @@
         <section id="ai-analysis" class="content-section">
             <div class="ai-analysis-container">
                 <div class="ai-analysis-header">
-                    <h2>AI效能分析</h2>
-                    <p class="ai-description">基于数据驱动的智能分析，为团队效能提升提供专业建议</p>
+                    <h2>AI文档分析</h2>
+                    <p class="ai-description">支持多种文件格式的智能分析，基于SiliconFlow AI技术</p>
                 </div>
 
-                <!-- 文件上传区域 -->
-                <div class="upload-section">
-                    <h3>文件分析</h3>
-                    <div class="upload-area" id="upload-area">
-                        <div class="upload-content">
-                            <div class="upload-icon">📁</div>
-                            <p>拖拽文件到此处或点击上传</p>
-                            <p class="upload-hint">支持 .txt, .py, .js, .java, .md 等文件格式</p>
-                            <input type="file" id="file-input" accept=".txt,.py,.js,.java,.md,.json,.xml,.csv" style="display: none;">
-                            <button class="upload-btn" onclick="document.getElementById('file-input').click()">选择文件</button>
+                <!-- 分析模块导航 -->
+                <div class="ai-tabs">
+                    <button class="ai-tab-btn active" data-ai-tab="upload">文件上传</button>
+                    <button class="ai-tab-btn" data-ai-tab="history">分析历史</button>
+                    <button class="ai-tab-btn" data-ai-tab="settings">分析设置</button>
+                </div>
+
+                <!-- 文件上传标签页 -->
+                <div id="upload" class="ai-tab-content active">
+                    <!-- 自定义提示词设置 -->
+                    <div class="prompt-section">
+                        <h3>分析提示词</h3>
+                        <div class="prompt-container">
+                            <textarea id="custom-prompt" class="prompt-textarea" 
+                                placeholder="输入自定义分析提示词（可选），留空则使用默认提示词"></textarea>
+                            <div class="prompt-actions">
+                                <button class="btn-secondary" onclick="loadDefaultPrompt()">使用默认</button>
+                                <button class="btn-secondary" onclick="clearPrompt()">清空</button>
+                            </div>
                         </div>
                     </div>
-                    <div class="upload-progress" id="upload-progress" style="display: none;">
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="progress-fill"></div>
+
+                    <!-- 文件上传区域 -->
+                    <div class="upload-section">
+                        <h3>文件上传</h3>
+                        <div class="upload-area" id="upload-area">
+                            <div class="upload-content">
+                                <div class="upload-icon">📄</div>
+                                <p>拖拽文件到此处或点击上传</p>
+                                <p class="upload-hint">支持 PDF、Word、Excel、Markdown、TXT 格式，最大 5MB</p>
+                                <input type="file" id="file-input" 
+                                    accept=".pdf,.doc,.docx,.xls,.xlsx,.md,.txt" 
+                                    style="display: none;">
+                                <button class="upload-btn" onclick="document.getElementById('file-input').click()">选择文件</button>
+                            </div>
                         </div>
-                        <span class="progress-text" id="progress-text">上传中...</span>
+                        
+                        <!-- 文件信息显示 -->
+                        <div class="file-info" id="file-info" style="display: none;">
+                            <div class="file-details">
+                                <span class="file-name" id="file-name"></span>
+                                <span class="file-size" id="file-size"></span>
+                                <span class="file-type" id="file-type"></span>
+                            </div>
+                            <button class="btn-danger" onclick="clearFile()">移除文件</button>
+                        </div>
+
+                        <!-- 上传进度 -->
+                        <div class="upload-progress" id="upload-progress" style="display: none;">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progress-fill"></div>
+                            </div>
+                            <span class="progress-text" id="progress-text">准备上传...</span>
+                        </div>
+
+                        <!-- 上传按钮 -->
+                        <div class="upload-actions" id="upload-actions" style="display: none;">
+                            <button class="btn-primary" onclick="startAnalysis()" id="analyze-btn">开始分析</button>
+                            <button class="btn-secondary" onclick="clearFile()">重新选择</button>
+                        </div>
+                    </div>
+
+                    <!-- 分析结果展示区域 -->
+                    <div class="analysis-results" id="analysis-results" style="display: none;">
+                        <div class="analysis-header">
+                            <h3>分析结果</h3>
+                            <div class="analysis-actions">
+                                <button class="btn-secondary" onclick="exportReport('html')">导出HTML</button>
+                                <button class="btn-secondary" onclick="exportReport('json')">导出JSON</button>
+                                <button class="btn-danger" onclick="clearResults()">清除结果</button>
+                            </div>
+                        </div>
+                        <div class="analysis-content" id="analysis-content">
+                            <!-- 分析结果将在这里显示 -->
+                        </div>
                     </div>
                 </div>
 
-                <!-- AI分析结果展示区域 -->
-                <div class="analysis-results" id="analysis-results">
-                    <div class="analysis-content" id="analysis-content">
-                        <!-- 默认显示基于当前数据的分析 -->
-                        <div class="default-analysis">
-                            <h3>当前数据分析</h3>
-                            <div class="analysis-text" id="default-analysis-text">
-                                正在加载分析结果...
+                <!-- 分析历史标签页 -->
+                <div id="history" class="ai-tab-content">
+                    <div class="history-header">
+                        <h3>分析历史</h3>
+                        <div class="history-controls">
+                            <input type="text" id="history-search" placeholder="搜索文件名..." class="search-input">
+                            <select id="history-filter" class="filter-select">
+                                <option value="">所有格式</option>
+                                <option value="pdf">PDF</option>
+                                <option value="docx">Word</option>
+                                <option value="xlsx">Excel</option>
+                                <option value="md">Markdown</option>
+                                <option value="txt">文本</option>
+                            </select>
+                            <button class="btn-secondary" onclick="refreshHistory()">刷新</button>
+                        </div>
+                    </div>
+                    
+                    <div class="history-list" id="history-list">
+                        <!-- 历史记录将在这里显示 -->
+                        <div class="loading-placeholder">正在加载历史记录...</div>
+                    </div>
+                    
+                    <!-- 分页控件 -->
+                    <div class="pagination" id="history-pagination" style="display: none;">
+                        <button class="page-btn" onclick="loadHistoryPage(currentPage - 1)" id="prev-page">上一页</button>
+                        <span class="page-info" id="page-info">第 1 页，共 1 页</span>
+                        <button class="page-btn" onclick="loadHistoryPage(currentPage + 1)" id="next-page">下一页</button>
+                    </div>
+                </div>
+
+                <!-- 分析设置标签页 -->
+                <div id="settings" class="ai-tab-content">
+                    <div class="ai-settings-container">
+                        <h3>AI分析配置</h3>
+                        
+                        <!-- 连接测试 -->
+                        <div class="settings-section">
+                            <h4>连接状态</h4>
+                            <div class="connection-status">
+                                <div class="status-indicator" id="connection-status">
+                                    <span class="status-dot"></span>
+                                    <span class="status-text">未知</span>
+                                </div>
+                                <button class="btn-secondary" onclick="testConnection()">测试连接</button>
+                            </div>
+                        </div>
+
+                        <!-- 默认提示词设置 -->
+                        <div class="settings-section">
+                            <h4>默认分析提示词</h4>
+                            <div class="prompt-settings">
+                                <textarea id="default-prompt-setting" class="prompt-textarea" 
+                                    placeholder="设置默认的分析提示词..."></textarea>
+                                <div class="prompt-actions">
+                                    <button class="btn-primary" onclick="saveDefaultPrompt()">保存设置</button>
+                                    <button class="btn-secondary" onclick="resetDefaultPrompt()">重置默认</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 系统信息 -->
+                        <div class="settings-section">
+                            <h4>系统信息</h4>
+                            <div class="system-info" id="system-info">
+                                <div class="info-item">
+                                    <span class="info-label">支持格式:</span>
+                                    <span class="info-value">PDF, Word, Excel, Markdown, TXT</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">最大文件大小:</span>
+                                    <span class="info-value">5MB</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">AI模型:</span>
+                                    <span class="info-value" id="ai-model">加载中...</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 统计信息 -->
+                        <div class="settings-section">
+                            <h4>使用统计</h4>
+                            <div class="stats-grid" id="usage-stats">
+                                <div class="stat-card">
+                                    <div class="stat-value" id="total-files">--</div>
+                                    <div class="stat-label">总文件数</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value" id="total-analyses">--</div>
+                                    <div class="stat-label">总分析数</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value" id="avg-time">--</div>
+                                    <div class="stat-label">平均处理时间(秒)</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value" id="success-rate">--</div>
+                                    <div class="stat-label">成功率(%)</div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -336,8 +487,138 @@
             </div>
         </section>
 
-        <!-- 系统设置模块 - 保留模块框架，删除内容 -->
+        <!-- 系统设置模块 -->
         <section id="settings" class="content-section">
+            <div class="settings-container">
+                <div class="settings-header">
+                    <h2>系统设置</h2>
+                    <p class="settings-description">配置系统参数和个性化选项</p>
+                </div>
+
+                <div class="settings-content">
+                    <!-- 数据源配置 -->
+                    <div class="settings-section">
+                        <h3>数据源配置</h3>
+                        <div class="settings-group">
+                            <div class="setting-item">
+                                <label for="data-refresh-interval">数据刷新间隔（分钟）</label>
+                                <input type="number" id="data-refresh-interval" min="1" max="60" value="5" class="setting-input">
+                            </div>
+                            <div class="setting-item">
+                                <label for="auto-refresh">自动刷新</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="auto-refresh" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 显示设置 -->
+                    <div class="settings-section">
+                        <h3>显示设置</h3>
+                        <div class="settings-group">
+                            <div class="setting-item">
+                                <label for="theme-select">主题模式</label>
+                                <select id="theme-select" class="setting-select">
+                                    <option value="light">浅色模式</option>
+                                    <option value="dark">深色模式</option>
+                                    <option value="auto">跟随系统</option>
+                                </select>
+                            </div>
+                            <div class="setting-item">
+                                <label for="chart-animation">图表动画</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="chart-animation" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="setting-item">
+                                <label for="decimal-places">数值小数位数</label>
+                                <select id="decimal-places" class="setting-select">
+                                    <option value="0">0位</option>
+                                    <option value="1">1位</option>
+                                    <option value="2" selected>2位</option>
+                                    <option value="3">3位</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 通知设置 -->
+                    <div class="settings-section">
+                        <h3>通知设置</h3>
+                        <div class="settings-group">
+                            <div class="setting-item">
+                                <label for="enable-notifications">启用通知</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="enable-notifications" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="setting-item">
+                                <label for="alert-threshold">异常阈值提醒</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="alert-threshold" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 数据导出设置 -->
+                    <div class="settings-section">
+                        <h3>数据导出</h3>
+                        <div class="settings-group">
+                            <div class="setting-item">
+                                <label for="export-format">默认导出格式</label>
+                                <select id="export-format" class="setting-select">
+                                    <option value="excel">Excel (.xlsx)</option>
+                                    <option value="csv">CSV (.csv)</option>
+                                    <option value="pdf">PDF (.pdf)</option>
+                                </select>
+                            </div>
+                            <div class="setting-item">
+                                <label for="include-charts">导出包含图表</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="include-charts" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI分析设置 -->
+                    <div class="settings-section">
+                        <h3>AI分析设置</h3>
+                        <div class="settings-group">
+                            <div class="setting-item">
+                                <label for="ai-analysis-level">分析详细程度</label>
+                                <select id="ai-analysis-level" class="setting-select">
+                                    <option value="basic">基础分析</option>
+                                    <option value="detailed" selected>详细分析</option>
+                                    <option value="comprehensive">全面分析</option>
+                                </select>
+                            </div>
+                            <div class="setting-item">
+                                <label for="auto-analysis">自动分析</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="auto-analysis">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 操作按钮 -->
+                    <div class="settings-actions">
+                        <button class="btn-primary" onclick="saveSettings()">保存设置</button>
+                        <button class="btn-secondary" onclick="resetSettings()">重置默认</button>
+                        <button class="btn-secondary" onclick="exportSettings()">导出配置</button>
+                        <button class="btn-secondary" onclick="importSettings()">导入配置</button>
+                    </div>
+                </div>
+            </div>
         </section>
     </main>
 
