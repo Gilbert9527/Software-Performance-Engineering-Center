@@ -293,8 +293,47 @@
             </div>
         </section>
 
-        <!-- AI分析模块 - 保留模块框架，删除内容 -->
+        <!-- AI分析模块 -->
         <section id="ai-analysis" class="content-section">
+            <div class="ai-analysis-container">
+                <div class="ai-analysis-header">
+                    <h2>AI效能分析</h2>
+                    <p class="ai-description">基于数据驱动的智能分析，为团队效能提升提供专业建议</p>
+                </div>
+
+                <!-- 文件上传区域 -->
+                <div class="upload-section">
+                    <h3>文件分析</h3>
+                    <div class="upload-area" id="upload-area">
+                        <div class="upload-content">
+                            <div class="upload-icon">📁</div>
+                            <p>拖拽文件到此处或点击上传</p>
+                            <p class="upload-hint">支持 .txt, .py, .js, .java, .md 等文件格式</p>
+                            <input type="file" id="file-input" accept=".txt,.py,.js,.java,.md,.json,.xml,.csv" style="display: none;">
+                            <button class="upload-btn" onclick="document.getElementById('file-input').click()">选择文件</button>
+                        </div>
+                    </div>
+                    <div class="upload-progress" id="upload-progress" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill"></div>
+                        </div>
+                        <span class="progress-text" id="progress-text">上传中...</span>
+                    </div>
+                </div>
+
+                <!-- AI分析结果展示区域 -->
+                <div class="analysis-results" id="analysis-results">
+                    <div class="analysis-content" id="analysis-content">
+                        <!-- 默认显示基于当前数据的分析 -->
+                        <div class="default-analysis">
+                            <h3>当前数据分析</h3>
+                            <div class="analysis-text" id="default-analysis-text">
+                                正在加载分析结果...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </section>
 
         <!-- 系统设置模块 - 保留模块框架，删除内容 -->

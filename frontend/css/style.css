@@ -3197,3 +3197,477 @@ tr:focus-within {
         flex: 0 0 80px;
     }
 }
+/
+* ==================== AI分析页面样式 ==================== */
+
+.ai-analysis-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 30px 20px;
+}
+
+.ai-analysis-header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.ai-analysis-header h2 {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--apple-gray-900);
+    margin-bottom: 12px;
+}
+
+.ai-description {
+    font-size: 18px;
+    color: var(--apple-gray-600);
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* 文件上传区域 */
+.upload-section {
+    background: var(--apple-white);
+    border-radius: var(--apple-radius-xl);
+    padding: 30px;
+    margin-bottom: 30px;
+    border: 1px solid var(--apple-gray-200);
+    box-shadow: var(--apple-shadow-sm);
+}
+
+.upload-section h3 {
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--apple-gray-900);
+    margin-bottom: 20px;
+}
+
+.upload-area {
+    border: 2px dashed var(--apple-gray-300);
+    border-radius: var(--apple-radius-lg);
+    padding: 40px 20px;
+    text-align: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    background: var(--apple-gray-50);
+}
+
+.upload-area:hover {
+    border-color: var(--apple-blue);
+    background: var(--apple-blue-ultra-light);
+}
+
+.upload-area.drag-over {
+    border-color: var(--apple-blue);
+    background: var(--apple-blue-ultra-light);
+    transform: scale(1.02);
+}
+
+.upload-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+}
+
+.upload-icon {
+    font-size: 48px;
+    opacity: 0.7;
+}
+
+.upload-area p {
+    margin: 0;
+    font-size: 16px;
+    color: var(--apple-gray-700);
+}
+
+.upload-hint {
+    font-size: 14px !important;
+    color: var(--apple-gray-500) !important;
+}
+
+.upload-btn {
+    background: var(--apple-blue);
+    color: var(--apple-white);
+    border: none;
+    padding: 12px 24px;
+    border-radius: var(--apple-radius-md);
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: var(--apple-shadow-sm);
+}
+
+.upload-btn:hover {
+    background: var(--apple-blue-dark);
+    transform: translateY(-2px);
+    box-shadow: var(--apple-shadow-md);
+}
+
+/* 上传进度条 */
+.upload-progress {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: var(--apple-gray-200);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--apple-blue), var(--apple-blue-light));
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    width: 0%;
+}
+
+.progress-text {
+    font-size: 14px;
+    color: var(--apple-gray-600);
+    font-weight: 500;
+}
+
+/* 分析结果区域 */
+.analysis-results {
+    background: var(--apple-white);
+    border-radius: var(--apple-radius-xl);
+    padding: 30px;
+    border: 1px solid var(--apple-gray-200);
+    box-shadow: var(--apple-shadow-sm);
+    min-height: 400px;
+}
+
+.analysis-content h3 {
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--apple-gray-900);
+    margin-bottom: 20px;
+}
+
+.analysis-text {
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--apple-gray-700);
+}
+
+.analysis-text h3 {
+    color: var(--apple-blue);
+    margin-top: 25px;
+    margin-bottom: 15px;
+}
+
+.analysis-text ul {
+    padding-left: 20px;
+    margin: 15px 0;
+}
+
+.analysis-text li {
+    margin-bottom: 8px;
+    color: var(--apple-gray-700);
+}
+
+/* 文件分析结果样式 */
+.file-analysis-result {
+    animation: fadeInUp 0.5s ease;
+}
+
+.file-info {
+    background: var(--apple-gray-50);
+    border-radius: var(--apple-radius-lg);
+    padding: 20px;
+    margin-bottom: 25px;
+}
+
+.file-info h4 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--apple-gray-900);
+    margin-bottom: 15px;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.info-label {
+    font-weight: 500;
+    color: var(--apple-gray-600);
+}
+
+.info-value {
+    font-weight: 600;
+    color: var(--apple-gray-900);
+}
+
+.analysis-summary,
+.analysis-insights,
+.analysis-recommendations {
+    margin-bottom: 25px;
+}
+
+.analysis-summary h4,
+.analysis-insights h4,
+.analysis-recommendations h4 {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--apple-gray-900);
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.analysis-summary h4::before {
+    content: "📊";
+}
+
+.analysis-insights h4::before {
+    content: "💡";
+}
+
+.analysis-recommendations h4::before {
+    content: "🚀";
+}
+
+.analysis-summary p {
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--apple-gray-700);
+    background: var(--apple-blue-ultra-light);
+    padding: 15px;
+    border-radius: var(--apple-radius-md);
+    border-left: 4px solid var(--apple-blue);
+}
+
+.analysis-insights ul,
+.analysis-recommendations ul {
+    list-style: none;
+    padding: 0;
+}
+
+.analysis-insights li,
+.analysis-recommendations li {
+    background: var(--apple-white);
+    border: 1px solid var(--apple-gray-200);
+    border-radius: var(--apple-radius-md);
+    padding: 15px;
+    margin-bottom: 10px;
+    position: relative;
+    padding-left: 45px;
+    transition: all 0.3s ease;
+}
+
+.analysis-insights li:hover,
+.analysis-recommendations li:hover {
+    background: var(--apple-gray-50);
+    border-color: var(--apple-blue);
+    transform: translateX(5px);
+}
+
+.analysis-insights li::before {
+    content: "✓";
+    position: absolute;
+    left: 15px;
+    top: 15px;
+    color: var(--apple-green);
+    font-weight: bold;
+    font-size: 16px;
+}
+
+.analysis-recommendations li::before {
+    content: "→";
+    position: absolute;
+    left: 15px;
+    top: 15px;
+    color: var(--apple-orange);
+    font-weight: bold;
+    font-size: 16px;
+}
+
+/* 操作按钮 */
+.analysis-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    margin-top: 30px;
+    padding-top: 25px;
+    border-top: 1px solid var(--apple-gray-200);
+}
+
+.action-btn {
+    padding: 12px 24px;
+    border-radius: var(--apple-radius-md);
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: none;
+    box-shadow: var(--apple-shadow-sm);
+}
+
+.action-btn.primary {
+    background: var(--apple-blue);
+    color: var(--apple-white);
+}
+
+.action-btn.primary:hover {
+    background: var(--apple-blue-dark);
+    transform: translateY(-2px);
+    box-shadow: var(--apple-shadow-md);
+}
+
+.action-btn.secondary {
+    background: var(--apple-white);
+    color: var(--apple-gray-700);
+    border: 1px solid var(--apple-gray-300);
+}
+
+.action-btn.secondary:hover {
+    background: var(--apple-gray-50);
+    border-color: var(--apple-gray-400);
+    transform: translateY(-2px);
+    box-shadow: var(--apple-shadow-md);
+}
+
+/* 错误信息样式 */
+.error-message {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.error-message h3 {
+    color: var(--apple-red);
+    margin-bottom: 15px;
+}
+
+.error-message p {
+    margin-bottom: 20px;
+}
+
+.retry-btn {
+    background: var(--apple-red);
+    color: var(--apple-white);
+    border: none;
+    padding: 12px 24px;
+    border-radius: var(--apple-radius-md);
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.retry-btn:hover {
+    background: var(--apple-red-dark);
+    transform: translateY(-2px);
+    box-shadow: var(--apple-shadow-md);
+}
+
+/* 默认分析样式 */
+.default-analysis {
+    animation: fadeIn 0.5s ease;
+}
+
+/* 动画效果 */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .ai-analysis-container {
+        padding: 20px 15px;
+    }
+    
+    .ai-analysis-header h2 {
+        font-size: 28px;
+    }
+    
+    .ai-description {
+        font-size: 16px;
+    }
+    
+    .upload-section,
+    .analysis-results {
+        padding: 20px;
+    }
+    
+    .upload-area {
+        padding: 30px 15px;
+    }
+    
+    .upload-icon {
+        font-size: 36px;
+    }
+    
+    .info-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    .analysis-actions {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .action-btn {
+        width: 100%;
+        max-width: 200px;
+    }
+}
+
+@media (max-width: 480px) {
+    .ai-analysis-header h2 {
+        font-size: 24px;
+    }
+    
+    .upload-section h3,
+    .analysis-content h3 {
+        font-size: 20px;
+    }
+    
+    .analysis-summary h4,
+    .analysis-insights h4,
+    .analysis-recommendations h4 {
+        font-size: 18px;
+    }
+    
+    .upload-area {
+        padding: 25px 10px;
+    }
+    
+    .upload-btn {
+        padding: 10px 20px;
+        font-size: 14px;
+    }
+}
