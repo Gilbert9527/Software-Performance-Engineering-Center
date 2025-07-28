@@ -340,16 +340,9 @@ class EfficiencyPlatform {
     }
 
     async loadAIAnalysis() {
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/ai-analysis`);
-            const data = await response.json();
-            const aiResults = document.getElementById('ai-results');
-            if (aiResults) {
-                aiResults.innerHTML = data.analysis || 'AI分析结果将在这里显示...';
-            }
-        } catch (error) {
-            console.error('加载AI分析失败:', error);
-        }
+        // AI分析功能由专门的ai-analysis.js模块处理
+        // 这里只需要确保AI分析模块已经初始化
+        console.log('AI分析模块已激活');
     }
 
     async loadSettings() {
