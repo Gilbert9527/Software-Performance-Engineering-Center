@@ -35,18 +35,27 @@ function setupTabs() {
             // 更新内容显示
             tabContents.forEach(content => {
                 content.classList.remove('active');
-                if (content.id === targetTab) {
-                    content.classList.add('active');
-                    
-                    // 根据标签页加载相应内容
-                    if (targetTab === 'history') {
-                        loadAnalysisHistory();
-                    } else if (targetTab === 'settings') {
-                        loadAIConfig();
-                        loadUsageStats();
-                    }
-                }
             });
+            
+            // 根据targetTab找到对应的内容元素
+            let targetContent;
+            if (targetTab === 'settings') {
+                targetContent = document.getElementById('ai-settings');
+            } else {
+                targetContent = document.getElementById(targetTab);
+            }
+            
+            if (targetContent) {
+                targetContent.classList.add('active');
+                
+                // 根据标签页加载相应内容
+                if (targetTab === 'history') {
+                    loadAnalysisHistory();
+                } else if (targetTab === 'settings') {
+                    loadAIConfig();
+                    loadUsageStats();
+                }
+            }
         });
     });
 }
