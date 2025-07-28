@@ -2734,17 +2734,7 @@ tr:focus-within {
     position: relative;
 }
 
-.nav-link[aria-current="page"]::after {
-    content: "";
-    position: absolute;
-    bottom: -2px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 20px;
-    height: 2px;
-    background: var(--apple-blue);
-    border-radius: 1px;
-}
+/* 移除冲突的aria-current下划线样式，使用统一的active类样式 */
 
 /* 加载状态的可访问性 */
 .loading {

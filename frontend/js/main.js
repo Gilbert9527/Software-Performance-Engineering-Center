@@ -83,8 +83,12 @@ class EfficiencyPlatform {
         // 更新导航状态
         document.querySelectorAll('.nav-link').forEach(link => {
             link.classList.remove('active');
+            link.removeAttribute('aria-current'); // 移除所有aria-current属性
         });
-        document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+        
+        const activeLink = document.querySelector(`[data-tab="${tab}"]`);
+        activeLink.classList.add('active');
+        activeLink.setAttribute('aria-current', 'page'); // 只给当前激活的标签添加aria-current
 
         // 切换内容区域
         document.querySelectorAll('.content-section').forEach(section => {
