@@ -198,10 +198,28 @@ body {
     border: 1px solid transparent;
 }
 
+/* 添加下划线效果 */
+.nav-link::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 50%;
+    width: 0;
+    height: 2px;
+    background: var(--apple-blue);
+    border-radius: 1px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateX(-50%);
+}
+
 .nav-link:hover {
     color: var(--apple-blue);
     background: var(--apple-blue-ultra-light);
     border-color: rgba(0, 122, 255, 0.3);
+}
+
+.nav-link:hover::after {
+    width: 60%;
 }
 
 .nav-link.active {
@@ -209,6 +227,10 @@ body {
     background: var(--apple-blue-ultra-light);
     border-color: rgba(0, 122, 255, 0.4);
     box-shadow: 0 0 15px rgba(0, 122, 255, 0.2);
+}
+
+.nav-link.active::after {
+    width: 80%;
 }
 
 /* 主内容区域 */
@@ -1697,6 +1719,12 @@ tr:hover td {
 [data-theme="dark"] .navbar {
     background: rgba(28, 28, 30, 0.8);
     border-bottom: 1px solid var(--apple-gray-300);
+}
+
+/* 暗色模式下的导航链接下划线 */
+[data-theme="dark"] .nav-link::after {
+    background: var(--apple-blue);
+}
 }
 
 /* 暗色模式下的主题切换按钮 */
