@@ -2,17 +2,8 @@
 
 // 默认设置配置
 const defaultSettings = {
-    dataRefreshInterval: 5,
-    autoRefresh: true,
-    theme: 'light',
-    chartAnimation: true,
-    decimalPlaces: 2,
-    enableNotifications: true,
-    alertThreshold: true,
-    exportFormat: 'excel',
-    includeCharts: true,
-    aiAnalysisLevel: 'detailed',
-    autoAnalysis: false
+    refreshInterval: 30,
+    emailNotifications: false
 };
 
 // 加载设置
@@ -21,74 +12,33 @@ function loadSettings() {
     const settings = savedSettings ? JSON.parse(savedSettings) : defaultSettings;
     
     // 应用设置到界面
-    document.getElementById('data-refresh-interval').value = settings.dataRefreshInterval;
-    document.getElementById('auto-refresh').checked = settings.autoRefresh;
-    document.getElementById('theme-select').value = settings.theme;
-    document.getElementById('chart-animation').checked = settings.chartAnimation;
-    document.getElementById('decimal-places').value = settings.decimalPlaces;
-    document.getElementById('enable-notifications').checked = settings.enableNotifications;
-    document.getElementById('alert-threshold').checked = settings.alertThreshold;
-    document.getElementById('export-format').value = settings.exportFormat;
-    document.getElementById('include-charts').checked = settings.includeCharts;
-    document.getElementById('ai-analysis-level').value = settings.aiAnalysisLevel;
-    document.getElementById('auto-analysis').checked = settings.autoAnalysis;
+    const refreshIntervalEl = document.getElementById('refresh-interval');
+    const emailNotificationsEl = document.getElementById('email-notifications');
+    
+    if (refreshIntervalEl) {
+        refreshIntervalEl.value = settings.refreshInterval;
+    }
+    if (emailNotificationsEl) {
+        emailNotificationsEl.checked = settings.emailNotifications;
+    }
     
     return settings;
 }
 
 // 保存设置
 function saveSettings() {
+    const refreshIntervalEl = document.getElementById('refresh-interval');
+    const emailNotificationsEl = document.getElementById('email-notifications');
+    
     const settings = {
-        dataRefreshInterval: parseInt(document.getElementById('data-refresh-interval').value),
-        autoRefresh: document.getElementById('auto-refresh').checked,
-        theme: document.getElementById('theme-select').value,
-        chartAnimation: document.getElementById('chart-animation').checked,
-        decimalPlaces: parseInt(document.getElementById('decimal-places').value),
-        enableNotifications: document.getElementById('enable-notifications').checked,
-        alertThreshold: document.getElementById('alert-threshold').checked,
-        exportFormat: document.getElementById('export-format').value,
-        includeCharts: document.getElementById('include-charts').checked,
-        aiAnalysisLevel: document.getElementById('ai-analysis-level').value,
-        autoAnalysis: document.getElementById('auto-analysis').checked
+        refreshInterval: refreshIntervalEl ? parseInt(refreshIntervalEl.value) : defaultSettings.refreshInterval,
+        emailNotifications: emailNotificationsEl ? emailNotificationsEl.checked : defaultSettings.emailNotifications
     };
     
     localStorage.setItem('systemSettings', JSON.stringify(settings));
     
-    // 应用设置
-    applySettings(settings);
-    
     // 显示保存成功提示
     showNotification('设置已保存', 'success');
-}
-
-// 应用设置
-function applySettings(settings) {
-    // 应用主题设置
-    if (settings.theme === 'dark') {
-        document.body.classList.add('dark-theme');
-    } else if (settings.theme === 'light') {
-        document.body.classList.remove('dark-theme');
-    } else if (settings.theme === 'auto') {
-        // 跟随系统主题
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        if (prefersDark) {
-            document.body.classList.add('dark-theme');
-        } else {
-            document.body.classList.remove('dark-theme');
-        }
-    }
-    
-    // 应用自动刷新设置
-    if (settings.autoRefresh) {
-        startAutoRefresh(settings.dataRefreshInterval);
-    } else {
-        stopAutoRefresh();
-    }
-    
-    // 更新图表动画设置
-    if (typeof Chart !== 'undefined') {
-        Chart.defaults.animation = settings.chartAnimation;
-    }
 }
 
 // 重置设置
@@ -96,72 +46,7 @@ function resetSettings() {
     if (confirm('确定要重置所有设置为默认值吗？')) {
         localStorage.removeItem('systemSettings');
         loadSettings();
-        applySettings(defaultSettings);
         showNotification('设置已重置为默认值', 'info');
-    }
-}
-
-// 导出设置
-function exportSettings() {
-    const settings = JSON.parse(localStorage.getItem('systemSettings') || JSON.stringify(defaultSettings));
-    const dataStr = JSON.stringify(settings, null, 2);
-    const dataBlob = new Blob([dataStr], {type: 'application/json'});
-    
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(dataBlob);
-    link.download = 'system-settings.json';
-    link.click();
-    
-    showNotification('设置配置已导出', 'success');
-}
-
-// 导入设置
-function importSettings() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    
-    input.onchange = function(event) {
-        const file = event.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const settings = JSON.parse(e.target.result);
-                    localStorage.setItem('systemSettings', JSON.stringify(settings));
-                    loadSettings();
-                    applySettings(settings);
-                    showNotification('设置配置已导入', 'success');
-                } catch (error) {
-                    showNotification('导入失败：文件格式错误', 'error');
-                }
-            };
-            reader.readAsText(file);
-        }
-    };
-    
-    input.click();
-}
-
-// 自动刷新相关变量
-let autoRefreshInterval = null;
-
-// 开始自动刷新
-function startAutoRefresh(intervalMinutes) {
-    stopAutoRefresh(); // 先停止现有的定时器
-    
-    autoRefreshInterval = setInterval(() => {
-        if (typeof refreshDashboardData === 'function') {
-            refreshDashboardData();
-        }
-    }, intervalMinutes * 60 * 1000);
-}
-
-// 停止自动刷新
-function stopAutoRefresh() {
-    if (autoRefreshInterval) {
-        clearInterval(autoRefreshInterval);
-        autoRefreshInterval = null;
     }
 }
 
@@ -222,18 +107,8 @@ function showNotification(message, type = 'info') {
 
 // 页面加载时初始化设置
 document.addEventListener('DOMContentLoaded', function() {
-    const settings = loadSettings();
-    applySettings(settings);
-    
-    // 监听主题系统变化（仅在auto模式下）
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-        const currentSettings = JSON.parse(localStorage.getItem('systemSettings') || JSON.stringify(defaultSettings));
-        if (currentSettings.theme === 'auto') {
-            if (e.matches) {
-                document.body.classList.add('dark-theme');
-            } else {
-                document.body.classList.remove('dark-theme');
-            }
-        }
-    });
+    // 延迟加载设置，确保DOM元素已存在
+    setTimeout(() => {
+        loadSettings();
+    }, 100);
 });
